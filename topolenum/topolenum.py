@@ -1,6 +1,6 @@
 import copy,math
 from sys import stderr
-from collections import defaultdict
+from collections import defaultdict,namedtuple
 from StringIO import StringIO
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tree import T
@@ -325,3 +325,5 @@ def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_c
 #             print >>stderr,"Wrote current assemblies to file","trees_on_iter_"+str(iterations).zfill(2)+'.txt'
         iterations += 1
     return assemblies,accepted_assemblies
+
+LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
