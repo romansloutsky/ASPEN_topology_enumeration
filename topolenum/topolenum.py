@@ -290,19 +290,56 @@ LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
 
 class TreeAssembly(object):
+  def __init__(self,pwleafdist_histograms,histogram_freq_cutoff,leaves_to_assemble):
+    #===========================================================================
+    # The two data attributes below will are set on the class, not in instances,
+    # meaning they will be shared between all instances of this class, saving
+    # lots of space as the number of assemblies grows.
+    # *** The are INVARIANTS and should not be changed by instances!!! ***
+    #===========================================================================
+    
+    # Make a sorted master reference tuple of pw distance freq constraints, ...
+    type(self).constraints_master = tuple(sorted([
+                                            # by creating LPDF tuples ...
+                                            LPDF(pair_histogram[0],score[0],score[1])
+                                            # for every histogram of pw distances for a leaf pair ...
+                                            for pair_histogram in
+                                            # present in a built-in-place subset of
+                                            # the full histogram for that pair ...
+        [(leafpair,[dist for i,dist in enumerate(distances) if
+                    # of distances ordered by freq such that the sum of their freqs
+                    # is less than the requested frequency cutoff, ...
+                    sum(d[1] for d in distances[:i]) < constraint_freq_cutoff]
+          ) for leafpair,distances in pwleafdist_histograms]
+                                            for score in pair_histogram[1]],
+                                           key=lambda x: (x.dist,1-x.freq) # sorted on (shortest dist, highest freq)
+                                                 )
+                                          )
+    
+    # Unlike constraints_master, which guarantees invariance by being recursively immutable,
+    # this is a mutable dict. Is there a way to force immutability?
+    type(self).pwdist_histograms_dict = {leafpair:dict(dist_histogram)
+                                         for leafpair,dist_histogram in pwleafdist_histograms}
+    
+    #===========================================================================
+    # END of class attributes
+    #===========================================================================
+    
+    self.built_clades = []
+    self.free_leaves = leaves_to_assemble
+    self.constraints_idx = range(len(self.constraints_master))
+    self.score = 0.0
   
   def find_extensions(self):
     new_pairs = []
     joins = defaultdict(list)
     attachments = defaultdict(list)
     already_connected = {frozenset(clade.leaf_names):clade for clade in self.built_clades}
-    # All pairwise intersections should be empty
-    assert not any(frozenset.intersection(*leafsetpair)
+    assert not any(set.intersection(*leafsetpair) # All pairwise intersections should be empty
                    for leafsetpair in itertools.combinations(already_connected.iterkeys(),2))
-    already_connected_splat = frozenset({leaf for leafset in already_connected
-                                              for leaf in leafset})
+    already_connected_splat = frozenset({ln for k in already_connected for ln in k})
     ac_leafdict = {leaf:clade for leafset,clade in already_connected.iteritems()
-                                             for leaf in leafset}
+                                             for l in leafset}
     for i in self.constraints_idx:
       pair = self.constraints_master[i]
       if pair.dist == 1:
@@ -318,7 +355,7 @@ class TreeAssembly(object):
           if any(pair.leaves <= built_leafset for built_leafset in already_connected.iterkeys()):
             # If a built clade already contains both leaves, there is nothing to do
             continue
-          elif pair.dist == sum(len(ac_leafdict[leaf].get_path(leaf)) for leaf in pair.leaves)+1:
+          elif pair.dist == sum(len(ac_leafdict[leaf].get_path[leaf]) for leaf in pair.leaves)+1:
             # If separate built clades contain the two leaves, and if the pair has distance of
             # sum of distances from root to each leaf in its current clade +1 (accounting for new
             # root), then the two host clades can be joined under a common root. Note that
@@ -330,21 +367,21 @@ class TreeAssembly(object):
           else:
             continue
         else:
-          # pair.leaves & already_connected_splat and not pair.leaves <= already_connected_splat
-          # implies one leaf in pair is already contained in a built clade, the other isn't
+          # pair.leaves & already_connected_splat and not pair.leaves <= already_connected_splat =>
+          # => one leaf in pair is already contained in a built clade, the other isn't
           for leaf in pair.leaves:
             try:
               clade_of_attached_leaf = ac_leafdict[leaf]
               attached_leaf = leaf
             except KeyError as e:
               new_leaf = leaf
-          if pair.dist == len(clade_of_attached_leaf.get_path(attached_leaf))+1:
-            # Everything is same as for joining two built clades, except new leaf is attached to
-            # existing clade. Distance must be distance from root of leaf already in existing
-            # clade +1 for new root, to which new leaf will be attached directly. Again,
-            # aggregating all evidence for attaching new leaf to existing clade in a dict of
-            # lists keyed by pair: existing clade,new leaf.
-            attachments[frozenset({clade_of_attached_leaf,new_leaf})].append(pair)
+            if pair.dist == len(clade_of_attached_leaf.get_path(attached_leaf))+1:
+              # Everything is same as for joining two built clades, except new leaf is attached to
+              # existing clade. Distance must be distance from root of leaf already in existing
+              # clade +1 for new root, to which new leaf will be attached directly. Again,
+              # aggregating all evidence for attaching new leaf to existing clade in a dict of
+              # lists keyed by pair: existing clade,new leaf.
+              attachments[frozenset(clade_of_attached_leaf,new_leaf)].append(pair)
     return new_pairs,joins,attachments
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
