@@ -327,3 +327,29 @@ def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_c
     return assemblies,accepted_assemblies
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
+class TreeAssembly(object):
+  
+  def find_extensions(self):
+    new_pairs = []
+    joints = defaultdict(list)
+    attachments = defaultdict(list)
+    already_connected = {frozenset(c.leaf_names):c for c in self.built_clades}
+    already_connected_splat = frozenset({ln for k in already_connected for ln in k})
+#     unused_constraints = [self.pairs_master[i] for i in assembly[2]]
+    for i in self.constraints_idx:
+      pair = self.constraints_master[i]
+      if pair.dist == 1:
+        # Pairs with distance 1 are added w/o questions. If continue with this path,
+        # later we will make sure to remove from consideration all pairs that conflict this.
+        new_pairs.append(pair)
+      elif not pair.leaves & already_connected_splat:
+        # If a pair has distance > 1 and neither leaf in pair has already been added to a
+        # clade, then we can't do anything with it, so we silently skip it
+        continue
+      else:
+        if pair.leaves <= already_connected_splat:
+          if any(pair.leaves <= built_leafset for built_leafset in already_connected.iterkeys()):
+            # If a built clade already contains both leaves, there is nothing to do
+            continue
+        else:
+          #
