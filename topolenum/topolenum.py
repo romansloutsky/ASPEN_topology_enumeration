@@ -356,8 +356,8 @@ class TreeAssembly(object):
   
   def find_extensions(self):
     new_pairs = []
-    joins = defaultdict(list)
-    attachments = defaultdict(list)
+    joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
+    attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     already_connected = {frozenset(clade.leaf_names):clade for clade in self.built_clades}
     assert not any(set.intersection(*leafsetpair) # All pairwise intersections should be empty
                    for leafsetpair in itertools.combinations(already_connected.iterkeys(),2))
