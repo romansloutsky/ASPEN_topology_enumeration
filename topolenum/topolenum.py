@@ -290,9 +290,9 @@ LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
 
 class TreeAssembly(object):
-  def __init__(self,pwleafdist_histograms,histogram_freq_cutoff,leaves_to_assemble):
+  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,absolute_freq_cutoff=0.01):
     #===========================================================================
-    # The two data attributes below will are set on the class, not in instances,
+    # The data attributes below will are set on the class, not in instances,
     # meaning they will be shared between all instances of this class, saving
     # lots of space as the number of assemblies grows.
     # *** The are INVARIANTS and should not be changed by instances!!! ***
@@ -320,6 +320,9 @@ class TreeAssembly(object):
     # this is a mutable dict. Is there a way to force immutability?
     type(self).pwdist_histograms_dict = {leafpair:dict(dist_histogram)
                                          for leafpair,dist_histogram in pwleafdist_histograms}
+    
+    # Again, a mutable variable, though I would like it to be immutable if possible
+    type(self).abs_cutoff = absolute_freq_cutoff
     
     #===========================================================================
     # END of class attributes
