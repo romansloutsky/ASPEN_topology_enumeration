@@ -289,6 +289,21 @@ def assembly_iteration(assemblies,pairs_master,pwhistdict,accepted_assemblies,en
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
 
+class ProposedExtension(object):
+  def __init__(self,child1,child2):
+    if any([isinstance(child1,str),isinstance(child2,str)]):
+      assert isinstance(child1,str) != isinstance(child2,str)
+      self.new_leaf = child1 if isinstance(child1,str) else child2
+      self.built_clade = child2 if isinstance(child1,str) else child1
+      self.unchecked_pwdists = [(leaf,new_leaf) for leaf in self.built_clade.leaf_names]
+    else:
+      self.clades = [child1,child2]
+      self.unchecked_pwdists = [leafpair for leafpair
+                                in itertools.product(*(clade.leaf_names
+                                                      for clade in self.clades))]
+    
+
+
 class TreeAssembly(object):
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,absolute_freq_cutoff=0.01):
     #===========================================================================
@@ -321,7 +336,7 @@ class TreeAssembly(object):
     type(self).pwdist_histograms_dict = {leafpair:dict(dist_histogram)
                                          for leafpair,dist_histogram in pwleafdist_histograms}
     
-    # Again, a mutable variable, though I would like it to be immutable if possible
+    # Again, a mutable variable, though I would like it to be immutable is possible
     type(self).abs_cutoff = absolute_freq_cutoff
     
     #===========================================================================
