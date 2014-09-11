@@ -305,6 +305,12 @@ class ProposedExtension(object):
 
 
 class TreeAssembly(object):
+  
+  class KeyPassingDefaultDict(defaultdict):
+    def __missing__(self,key):
+      self[key] = self.default_factory(key)
+      return self[key]
+  
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,absolute_freq_cutoff=0.01):
     #===========================================================================
     # The data attributes below will are set on the class, not in instances,
