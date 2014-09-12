@@ -296,14 +296,14 @@ class ProposedExtension(object):
       self.new_leaf = child1 if isinstance(child1,str) else child2
       self.built_clade = child2 if isinstance(child1,str) else child1
       
-      self.unchecked_pwdists = dict((frozenset({leaf,self.new_leaf}),
+      self.unverified = dict((frozenset({leaf,self.new_leaf}),
                                      len(self.built_clade.get_path(leaf))+1
                                      )
                                     for leaf in self.built_clade.leaf_names
                                     )
     else:
       self.clades = [child1,child2]
-      self.unchecked_pwdists = dict((frozenset({leafpair[0][0],leafpair[1][0]}),
+      self.unverified = dict((frozenset({leafpair[0][0],leafpair[1][0]}),
                                               leafpair[0][1]+leafpair[1][1]+1
                                      )
                                     for leafpair
@@ -321,15 +321,15 @@ class ProposedExtension(object):
   
   def check_pair(self,pair):
     if pair.leaves in self.consistent:
-      assert pair.leaves not in self.unchecked_pwdists
+      assert pair.leaves not in self.unverified
       assert pair.dist != self.consistent[pair.leaves].dist
       self.inconsistent[pair.leaves] = pair
     else:
-      if pair.dist == self.unchecked_pwdists[pair.leaves]:
+      if pair.dist == self.unverified[pair.leaves]:
         self.consistent[pair.leaves] = pair
+        self.unverified.pop(pair.leaves)
       else:
         self.inconsistent[pair.leaves] = pair
-      self.unchecked_pwdists.pop(pair.leaves)
 
 
 class TreeAssembly(object):
