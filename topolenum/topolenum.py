@@ -318,7 +318,18 @@ class ProposedExtension(object):
                                     )
     self.consistent = {}
     self.inconsistent = {}
-    
+  
+  def check_pair(self,pair):
+    if pair.leaves in self.consistent:
+      assert pair.leaves not in self.unchecked_pwdists
+      assert pair.dist != self.consistent[pair.leaves].dist
+      self.inconsistent[pair.leaves] = pair
+    else:
+      if pair.dist == self.unchecked_pwdists[pair.leaves]:
+        self.consistent[pair.leaves] = pair
+      else:
+        self.inconsistent[pair.leaves] = pair
+      self.unchecked_pwdists.pop(pair.leaves)
 
 
 class TreeAssembly(object):
