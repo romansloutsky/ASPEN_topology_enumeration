@@ -292,17 +292,24 @@ LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 class ProposedExtension(object):
   def __init__(self,child1,child2):
     if any([isinstance(child1,str),isinstance(child2,str)]):
+      # This extension is an attachment of a new leaf to a built clade ...
+      # ... so there should be one of each.
       assert isinstance(child1,str) != isinstance(child2,str)
-      self.new_leaf = child1 if isinstance(child1,str) else child2
-      self.built_clade = child2 if isinstance(child1,str) else child1
-      
+      self.new_leaf = child1 if isinstance(child1,str) else child2 # Figure out ...
+      self.built_clade = child2 if isinstance(child1,str) else child1 # .. which is which
+      # When a new leaf is attached to a built clade via a new root, the distance between
+      # the new leaf and each of the leaves in the built clade will be distance of leaf
+      # in existing clade to its current root + 1 to account for the new root
       self.unverified = dict((frozenset({leaf,self.new_leaf}),
                                      len(self.built_clade.get_path(leaf))+1
                                      )
                                     for leaf in self.built_clade.leaf_names
                                     )
-    else:
+    else: # This extension is the joining of two built clades
       self.clades = [child1,child2]
+      # When two built clades are joined, the resulting distance between any pair of leaves
+      # such that each leaf belongs to a different clade will be
+      # sum(distance of each leaf to its current root) + 1 to account for the new root.
       self.unverified = dict((frozenset({leafpair[0][0],leafpair[1][0]}),
                                               leafpair[0][1]+leafpair[1][1]+1
                                      )
@@ -321,15 +328,19 @@ class ProposedExtension(object):
   
   def check_pair(self,pair):
     if pair.leaves in self.consistent:
+      # If this leaf pair has already been added to consistent, then ...
+      # ... it should not be in unverified any more ...
       assert pair.leaves not in self.unverified
+      # ... and this new distance should be different from the consistent one ...
       assert pair.dist != self.consistent[pair.leaves].dist
-      self.inconsistent[pair.leaves] = pair
-    else:
-      if pair.dist == self.unverified[pair.leaves]:
-        self.consistent[pair.leaves] = pair
-        self.unverified.pop(pair.leaves)
-      else:
-        self.inconsistent[pair.leaves] = pair
+      self.inconsistent[pair.leaves] = pair # ... so it goes into inconsistent
+    else: # If it hasn't been added to consistent ...
+      if pair.dist == self.unverified[pair.leaves]: # ... and its distance matches expected
+        self.consistent[pair.leaves] = pair # it goes into consistent
+        self.unverified.pop(pair.leaves) # and is "verified", so pop it from unverified
+      else: # ... and its distance doesn't match expected
+        self.inconsistent[pair.leaves] = pair # it goes into inconsistent ...
+        # ... and it remains "unverified", so don't pop it from unverified
 
 
 class TreeAssembly(object):
@@ -404,21 +415,24 @@ class TreeAssembly(object):
         # clade, then we can't do anything with it, so we silently skip it
         continue
       else:
-        if pair.leaves <= already_connected_splat:
+        if pair.leaves <= already_connected_splat: # If both leaves are already in built clades
           if any(pair.leaves <= built_leafset for built_leafset in already_connected.iterkeys()):
-            # If a built clade already contains both leaves, there is nothing to do
+            # If one built clade already contains both leaves, there is nothing to do either
             continue
           else:
+            # If separate built clades contain one leaf each, then the pair goes into
+            # the corresponding join's ProposedExtension object
             joins[frozenset(ac_leafdict[leaf] for leaf in pair.leaves)].check_pair(pair)
         else:
-          # pair.leaves & already_connected_splat and not pair.leaves <= already_connected_splat
+          # (pair.leaves & already_connected_splat) and (not pair.leaves <= already_connected_splat)
           # implies one leaf in pair is already contained in a built clade, the other isn't
-          for leaf in pair.leaves:
+          for leaf in pair.leaves: # Identify the new leaf and the built clade
             try:
               clade_of_attached_leaf = ac_leafdict[leaf]
               attached_leaf = leaf
             except KeyError as e:
               new_leaf = leaf
+          # And put the pair into the corresponding attachment's ProposedExtension object
           attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair)
     return new_pairs,joins,attachments
 
