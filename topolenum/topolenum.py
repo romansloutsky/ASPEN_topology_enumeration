@@ -316,6 +316,8 @@ class ProposedExtension(object):
                                                            )
                                                          )
                                     )
+    self.consistent = {}
+    self.inconsistent = {}
     
 
 
