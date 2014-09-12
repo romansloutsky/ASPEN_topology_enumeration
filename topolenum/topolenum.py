@@ -387,11 +387,12 @@ class TreeAssembly(object):
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     already_connected = {frozenset(clade.leaf_names):clade for clade in self.built_clades}
-    assert not any(set.intersection(*leafsetpair) # All pairwise intersections should be empty
+    # All pairwise intersections should be empty
+    assert not any(frozenset.intersection(*leafsetpair)
                    for leafsetpair in itertools.combinations(already_connected.iterkeys(),2))
     already_connected_splat = frozenset({ln for k in already_connected for ln in k})
     ac_leafdict = {leaf:clade for leafset,clade in already_connected.iteritems()
-                                             for l in leafset}
+                                             for leaf in leafset}
     for i in self.constraints_idx:
       pair = self.constraints_master[i]
       if pair.dist == 1:
@@ -407,33 +408,18 @@ class TreeAssembly(object):
           if any(pair.leaves <= built_leafset for built_leafset in already_connected.iterkeys()):
             # If a built clade already contains both leaves, there is nothing to do
             continue
-          elif pair.dist == sum(len(ac_leafdict[leaf].get_path[leaf]) for leaf in pair.leaves)+1:
-            # If separate built clades contain the two leaves, and if the pair has distance of
-            # sum of distances from root to each leaf in its current clade +1 (accounting for new
-            # root), then the two host clades can be joined under a common root. Note that
-            # multiple such pieces of evidence for joining these two clades may exist among
-            # constraints: one for each pairwise dist between any leaf in one clade and any leaf
-            # in the other clade. We accumulate them all in a dict of lists, keyed by pair of
-            # clades to be joined.
-            joins[frozenset(ac_leafdict[leaf] for leaf in pair.leaves)].append(pair)
           else:
-            continue
+            joins[frozenset(ac_leafdict[leaf] for leaf in pair.leaves)].check_pair(pair)
         else:
-          # pair.leaves & already_connected_splat and not pair.leaves <= already_connected_splat =>
-          # => one leaf in pair is already contained in a built clade, the other isn't
+          # pair.leaves & already_connected_splat and not pair.leaves <= already_connected_splat
+          # implies one leaf in pair is already contained in a built clade, the other isn't
           for leaf in pair.leaves:
             try:
               clade_of_attached_leaf = ac_leafdict[leaf]
               attached_leaf = leaf
             except KeyError as e:
               new_leaf = leaf
-            if pair.dist == len(clade_of_attached_leaf.get_path(attached_leaf))+1:
-              # Everything is same as for joining two built clades, except new leaf is attached to
-              # existing clade. Distance must be distance from root of leaf already in existing
-              # clade +1 for new root, to which new leaf will be attached directly. Again,
-              # aggregating all evidence for attaching new leaf to existing clade in a dict of
-              # lists keyed by pair: existing clade,new leaf.
-              attachments[frozenset(clade_of_attached_leaf,new_leaf)].append(pair)
+          attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair)
     return new_pairs,joins,attachments
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
