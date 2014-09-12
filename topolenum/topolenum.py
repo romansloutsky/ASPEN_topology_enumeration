@@ -295,15 +295,27 @@ class ProposedExtension(object):
       assert isinstance(child1,str) != isinstance(child2,str)
       self.new_leaf = child1 if isinstance(child1,str) else child2
       self.built_clade = child2 if isinstance(child1,str) else child1
-      self.unchecked_pwdists = [((leaf,self.new_leaf),len(self.built_clade.get_path(leaf))+1)
-                                for leaf in self.built_clade.leaf_names]
+      
+      self.unchecked_pwdists = dict((frozenset({leaf,self.new_leaf}),
+                                     len(self.built_clade.get_path(leaf))+1
+                                     )
+                                    for leaf in self.built_clade.leaf_names
+                                    )
     else:
       self.clades = [child1,child2]
-      self.unchecked_pwdists = [((leafpair[0][0],leafpair[1][0]),
-                                 leafpair[0][1]+leafpair[1][1]+1) for leafpair
-                                in itertools.product(*([(leaf,len(clade.get_path(leaf)))
-                                                        for leaf in clade.leaf_names]
-                                                      for clade in self.clades))]
+      self.unchecked_pwdists = dict((frozenset({leafpair[0][0],leafpair[1][0]}),
+                                              leafpair[0][1]+leafpair[1][1]+1
+                                     )
+                                    for leafpair
+                                    in itertools.product(*([(leaf,
+                                                             len(clade.get_path(leaf))
+                                                             )
+                                                            for leaf in clade.leaf_names
+                                                            ]
+                                                           for clade in self.clades
+                                                           )
+                                                         )
+                                    )
     
 
 
