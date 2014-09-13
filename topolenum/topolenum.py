@@ -396,6 +396,14 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
+  def filter_proposed_extensions(self,extensions):
+    for key,ext in extensions.items():
+      for pair,dist in ext.unverified.items():
+        if self.pwdist_histograms_dict[pair][dist] < self.abs_cutoff:
+          extensions.pop(key)
+          break
+    return extensions
+  
   def find_extensions(self):
     new_pairs = []
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
@@ -437,7 +445,9 @@ class TreeAssembly(object):
               new_leaf = leaf
           # And put the pair into the corresponding attachment's ProposedExtension object
           attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair,i)
-    return new_pairs,joins,attachments
+    return (new_pairs,
+            self.filter_proposed_extensions(joins),
+            self.filter_proposed_extensions(attachments))
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
