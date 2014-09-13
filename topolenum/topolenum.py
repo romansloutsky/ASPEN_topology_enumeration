@@ -290,6 +290,9 @@ LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
 
 class ProposedExtension(object):
+  
+  IndexedPair = namedtuple('IndexedPair',['index','pair'])
+  
   def __init__(self,child1,child2):
     if any([isinstance(child1,str),isinstance(child2,str)]):
       # This extension is an attachment of a new leaf to a built clade ...
@@ -332,11 +335,11 @@ class ProposedExtension(object):
       # ... it should not be in unverified any more ...
       assert pair.leaves not in self.unverified
       # ... and this new distance should be different from the consistent one ...
-      assert pair.dist != self.consistent[pair.leaves].dist
+      assert pair.dist != self.consistent[pair.leaves].pair.dist
       self.inconsistent[i] = pair # ... so it goes into inconsistent
     else: # If it hasn't been added to consistent ...
       if pair.dist == self.unverified[pair.leaves]: # ... and its distance matches expected
-        self.consistent[pair.leaves] = pair # it goes into consistent
+        self.consistent[pair.leaves] = self.IndexedPair(i,pair) # it goes into consistent
         self.unverified.pop(pair.leaves) # and is "verified", so pop it from unverified
       else: # ... and its distance doesn't match expected
         self.inconsistent[i] = pair # it goes into inconsistent ...
