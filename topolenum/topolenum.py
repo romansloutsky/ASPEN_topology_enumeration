@@ -326,20 +326,20 @@ class ProposedExtension(object):
     self.consistent = {}
     self.inconsistent = {}
   
-  def check_pair(self,pair):
+  def check_pair(self,pair,i):
     if pair.leaves in self.consistent:
       # If this leaf pair has already been added to consistent, then ...
       # ... it should not be in unverified any more ...
       assert pair.leaves not in self.unverified
       # ... and this new distance should be different from the consistent one ...
       assert pair.dist != self.consistent[pair.leaves].dist
-      self.inconsistent[pair.leaves] = pair # ... so it goes into inconsistent
+      self.inconsistent[i] = pair # ... so it goes into inconsistent
     else: # If it hasn't been added to consistent ...
       if pair.dist == self.unverified[pair.leaves]: # ... and its distance matches expected
         self.consistent[pair.leaves] = pair # it goes into consistent
         self.unverified.pop(pair.leaves) # and is "verified", so pop it from unverified
       else: # ... and its distance doesn't match expected
-        self.inconsistent[pair.leaves] = pair # it goes into inconsistent ...
+        self.inconsistent[i] = pair # it goes into inconsistent ...
         # ... and it remains "unverified", so don't pop it from unverified
 
 
@@ -422,7 +422,7 @@ class TreeAssembly(object):
           else:
             # If separate built clades contain one leaf each, then the pair goes into
             # the corresponding join's ProposedExtension object
-            joins[frozenset(ac_leafdict[leaf] for leaf in pair.leaves)].check_pair(pair)
+            joins[frozenset(ac_leafdict[leaf] for leaf in pair.leaves)].check_pair(pair,i)
         else:
           # (pair.leaves & already_connected_splat) and (not pair.leaves <= already_connected_splat)
           # implies one leaf in pair is already contained in a built clade, the other isn't
@@ -433,7 +433,7 @@ class TreeAssembly(object):
             except KeyError as e:
               new_leaf = leaf
           # And put the pair into the corresponding attachment's ProposedExtension object
-          attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair)
+          attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair,i)
     return new_pairs,joins,attachments
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
