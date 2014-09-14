@@ -348,6 +348,8 @@ class ProposedExtension(object):
 
 class TreeAssembly(object):
   
+  IndexedClade = namedtuple('IndexedClade',['index','clade'])
+  
   class KeyPassingDefaultDict(defaultdict):
     def __missing__(self,key):
       self[key] = self.default_factory(key)
