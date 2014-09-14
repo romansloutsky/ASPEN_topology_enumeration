@@ -328,6 +328,7 @@ class ProposedExtension(object):
                                     )
     self.consistent = {}
     self.inconsistent = {}
+    self.score = 0.0
   
   def check_pair(self,pair,i):
     if pair.leaves in self.consistent:
@@ -341,6 +342,7 @@ class ProposedExtension(object):
       if pair.dist == self.unverified[pair.leaves]: # ... and its distance matches expected
         self.consistent[pair.leaves] = self.IndexedPair(i,pair) # it goes into consistent
         self.unverified.pop(pair.leaves) # and is "verified", so pop it from unverified
+        self.score += math.log(pair.freq)
       else: # ... and its distance doesn't match expected
         self.inconsistent[i] = pair # it goes into inconsistent ...
         # ... and it remains "unverified", so don't pop it from unverified
@@ -429,6 +431,7 @@ class TreeAssembly(object):
           extensions.pop(key)
           break
         else:
+          ext.score += math.log(pair_freq)
           ext.unverified.pop(pair)
     return extensions
   
