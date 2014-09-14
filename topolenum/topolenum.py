@@ -347,7 +347,7 @@ class ProposedExtension(object):
         self.inconsistent[i] = pair # it goes into inconsistent ...
         # ... and it remains "unverified", so don't pop it from unverified
   
-  def build_extension(self,assemblyobj):
+  def build_extension(self,assemblyobj,in_place=False):
     # To Do:
     # - pop consistent pairs from assemblyobj.constraints_idx
     # - make sure the clade(s) this obj has is(are) what's in assemblyobj.built_clades
@@ -355,7 +355,10 @@ class ProposedExtension(object):
     # - actually construct new clade
     # - pop existing clade(s) from assemblyobj.built_clades
     # - pop inconsistent pairs from assemblyobj.constraints_idx
+    if not in_place:
+      assemblyobj = copy.deepcopy(assemblyobj)
     assert not self.unverified
+    
     # Pop constraint pairdists we are accounting for with this extension from the list
     # of assemblyobj's constraints 
     for pair in sorted(self.consistent.itervalues(),key=lambda x: x.index,reverse=True):
@@ -364,9 +367,13 @@ class ProposedExtension(object):
     # be used in future extensions anyway
     for index in sorted(self.inconsistent.iterkeys(),reverse=True):
       assemblyobj.constraints_idx.pop(index)
+    
+    # Make sure to use clade(s) from this assemblyobj for construction, not the ones from
+    # the original that are stored in self.clades
     if hasattr(self,'new_leaf'):
-      assert set(self.built_clade.clade.leaf_names) ==\
-              set(assemblyobj.built_clades[self.built_clade.index].leaf_names)
+      built_clade = assemblyobj.built_clades.pop(self.built_clade.index)
+      assert set(self.built_clade.clade.leaf_names) == set(built_clade.leaf_names)
+      new_clades_attr = [built_clade.wrapped,Clade(name=self.new_leaf)]
       # One more thing to if this extension is an attachment of a new leaf:
       # Pop constraint pairdists where the new leaf has distance 1 with any other leaf,
       # regardless of whether the other leaf is involved in this extension. All such
@@ -381,6 +388,9 @@ class ProposedExtension(object):
     else:
       assert all(set(c.clade.leaf_names)==set(assemblyobj.built_clades[c.index].leaf_names)
                                                             for c in self.clades)
+      new_clades_attr = [assemblyobj.built_clades.pop(c.index).wrapped for c in self.clades]
+    
+    assemblyobj.built_clades.append(T(Clade(clades=new_clades_attr)))
 
 
 class TreeAssembly(object):
