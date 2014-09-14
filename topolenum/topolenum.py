@@ -348,13 +348,6 @@ class ProposedExtension(object):
         # ... and it remains "unverified", so don't pop it from unverified
   
   def build_extension(self,assemblyobj,in_place=False):
-    # To Do:
-    # - pop consistent pairs from assemblyobj.constraints_idx
-    # - make sure the clade(s) this obj has is(are) what's in assemblyobj.built_clades
-    # - modify assemblyobj.score
-    # - actually construct new clade
-    # - pop existing clade(s) from assemblyobj.built_clades
-    # - pop inconsistent pairs from assemblyobj.constraints_idx
     if not in_place:
       assemblyobj = copy.deepcopy(assemblyobj)
     assert not self.unverified
@@ -391,6 +384,8 @@ class ProposedExtension(object):
       new_clades_attr = [assemblyobj.built_clades.pop(c.index).wrapped for c in self.clades]
     
     assemblyobj.built_clades.append(T(Clade(clades=new_clades_attr)))
+    assemblyobj.score += self.score
+    return assemblyobj
 
 
 class TreeAssembly(object):
