@@ -304,9 +304,9 @@ class ProposedExtension(object):
       # the new leaf and each of the leaves in the built clade will be distance of leaf
       # in existing clade to its current root + 1 to account for the new root
       self.unverified = dict((frozenset({leaf,self.new_leaf}),
-                                     len(self.built_clade.get_path(leaf))+1
+                                     len(self.built_clade.clade.get_path(leaf))+1
                                      )
-                                    for leaf in self.built_clade.leaf_names
+                                    for leaf in self.built_clade.clade.leaf_names
                                     )
     else: # This extension is the joining of two built clades
       self.clades = [child1,child2]
@@ -318,9 +318,9 @@ class ProposedExtension(object):
                                      )
                                     for leafpair
                                     in itertools.product(*([(leaf,
-                                                             len(clade.get_path(leaf))
+                                                             len(clade.clade.get_path(leaf))
                                                              )
-                                                            for leaf in clade.leaf_names
+                                                            for leaf in clade.clade.leaf_names
                                                             ]
                                                            for clade in self.clades
                                                            )
@@ -410,13 +410,14 @@ class TreeAssembly(object):
     new_pairs = []
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
-    already_connected = {frozenset(clade.leaf_names):clade for clade in self.built_clades}
+    already_connected = {frozenset(clade.leaf_names):i for i,clade in
+                                                       enumerate(self.built_clades)}
     # All pairwise intersections should be empty
     assert not any(frozenset.intersection(*leafsetpair)
                    for leafsetpair in itertools.combinations(already_connected.iterkeys(),2))
     already_connected_splat = frozenset({ln for k in already_connected for ln in k})
-    ac_leafdict = {leaf:clade for leafset,clade in already_connected.iteritems()
-                                             for leaf in leafset}
+    ac_leafdict = {leaf:self.IndexedClade(i,self.built_clades[i])
+                   for leafset,i in already_connected.iteritems() for leaf in leafset}
     for i in self.constraints_idx:
       pair = self.constraints_master[i]
       if pair.dist == 1:
