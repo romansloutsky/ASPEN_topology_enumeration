@@ -344,6 +344,21 @@ class ProposedExtension(object):
       else: # ... and its distance doesn't match expected
         self.inconsistent[i] = pair # it goes into inconsistent ...
         # ... and it remains "unverified", so don't pop it from unverified
+  
+  def build_extension(self,assemblyobj):
+    # To Do:
+    # - pop consistent pairs from assemblyobj.constraints_idx
+    # - make sure the clade(s) this obj has is(are) what's in assemblyobj.built_clades
+    # - modify assemblyobj.score
+    # - actually construct new clade
+    # - pop existing clade(s) from assemblyobj.built_clades
+    # - pop inconsistent pairs from assemblyobj.constraints_idx
+    if hasattr(self,'new_leaf'):
+      assert set(self.built_clade.clade.leaf_names) ==\
+              set(assemblyobj.built_clades[self.built_clade.index].leaf_names)
+    else:
+      assert all(set(c.clade.leaf_names)==set(assemblyobj.built_clades[c.index].leaf_names)
+                                                            for c in self.clades)
 
 
 class TreeAssembly(object):
