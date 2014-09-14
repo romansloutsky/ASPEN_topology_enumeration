@@ -353,7 +353,6 @@ class ProposedExtension(object):
     # - actually construct new clade
     # - pop existing clade(s) from assemblyobj.built_clades
     # - pop inconsistent pairs from assemblyobj.constraints_idx
-    assert not self.unverified
     if hasattr(self,'new_leaf'):
       assert set(self.built_clade.clade.leaf_names) ==\
               set(assemblyobj.built_clades[self.built_clade.index].leaf_names)
@@ -417,7 +416,16 @@ class TreeAssembly(object):
   def filter_proposed_extensions(self,extensions):
     for key,ext in extensions.items():
       for pair,dist in ext.unverified.items():
-        if self.pwdist_histograms_dict[pair][dist] < self.abs_cutoff:
+        # Looking up pair histogram separately in case lookup throws KeyError,
+        # since we don't want to catch that one
+        pair_histogram = self.pwdist_histograms_dict[pair]
+        try:
+          pair_freq = pair_histogram[dist]
+        except KeyError:
+          # If the resulting pairdist is not in the histogram, it means it wasn't observed
+          # at all, so it's frequency is 0.
+          pair_freq = 0.0
+        if pair_freq < self.abs_cutoff:
           extensions.pop(key)
           break
         else:
@@ -433,7 +441,8 @@ class TreeAssembly(object):
     # All pairwise intersections should be empty
     assert not any(frozenset.intersection(*leafsetpair)
                    for leafsetpair in itertools.combinations(already_connected.iterkeys(),2))
-    already_connected_splat = frozenset({ln for k in already_connected for ln in k})
+    already_connected_splat = frozenset({leaf for leafset in already_connected
+                                              for leaf in leafset})
     ac_leafdict = {leaf:self.IndexedClade(i,self.built_clades[i])
                    for leafset,i in already_connected.iteritems() for leaf in leafset}
     for i in self.constraints_idx:
