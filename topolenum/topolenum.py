@@ -309,7 +309,7 @@ class ProposedExtension(object):
                                     for leaf in self.built_clade.clade.leaf_names
                                     )
     else: # This extension is the joining of two built clades
-      self.clades = [child1,child2]
+      self.clades = sorted([child1,child2],key=lambda x: x.index,reverse=True)
       # When two built clades are joined, the resulting distance between any pair of leaves
       # such that each leaf belongs to a different clade will be
       # sum(distance of each leaf to its current root) + 1 to account for the new root.
@@ -347,7 +347,7 @@ class ProposedExtension(object):
         self.inconsistent[i] = pair # it goes into inconsistent ...
         # ... and it remains "unverified", so don't pop it from unverified
   
-  def build_extension(self,assemblyobj):
+  def build_extension(self,assemblyobj,in_place=False):
     # To Do:
     # - pop consistent pairs from assemblyobj.constraints_idx
     # - make sure the clade(s) this obj has is(are) what's in assemblyobj.built_clades
@@ -355,27 +355,42 @@ class ProposedExtension(object):
     # - actually construct new clade
     # - pop existing clade(s) from assemblyobj.built_clades
     # - pop inconsistent pairs from assemblyobj.constraints_idx
+    if not in_place:
+      assemblyobj = copy.deepcopy(assemblyobj)
     assert not self.unverified
     
-    # Assemble for removal from constraints_idx indeces of consistent and inconsistent pairdists
-    drop_these = [pair.index for pair in self.consistent.values()]+self.inconsistent.keys()
+    # Pop constraint pairdists we are accounting for with this extension from the list
+    # of assemblyobj's constraints 
+    for pair in sorted(self.consistent.itervalues(),key=lambda x: x.index,reverse=True):
+      assemblyobj.constraints_idx.pop(pair.index)
+    # Also pop constraint pairdists inconsistent with this extension, since they can't
+    # be used in future extensions anyway
+    for index in sorted(self.inconsistent.iterkeys(),reverse=True):
+      assemblyobj.constraints_idx.pop(index)
+    
+    # Make sure to use clade(s) from this assemblyobj for construction, not the ones from
+    # the original that are stored in self.clades
     if hasattr(self,'new_leaf'):
-      assert set(self.built_clade.clade.leaf_names) ==\
-              set(assemblyobj.built_clades[self.built_clade.index].leaf_names)
-      # One more thing to do if this extension is an attachment of a new leaf:
-      # Add for removal constraint pairdists where the new leaf has distance 1 with any
-      # other leaf, regardless of whether the other leaf is involved in this extension.
-      # All such constraint distances are inconsistent with this extension. This additional
-      # check is necessary because of the special way new pair extensions are handled - with
+      built_clade = assemblyobj.built_clades.pop(self.built_clade.index)
+      assert set(self.built_clade.clade.leaf_names) == set(built_clade.leaf_names)
+      new_clades_attr = [built_clade.wrapped,Clade(name=self.new_leaf)]
+      # One more thing to if this extension is an attachment of a new leaf:
+      # Pop constraint pairdists where the new leaf has distance 1 with any other leaf,
+      # regardless of whether the other leaf is involved in this extension. All such
+      # constraint distances are inconsistent with this extension. This additional check
+      # is necessary because of the special way new pair extensions are handled - with
       # no questions asked.
-      drop_these.extend([i for i in assemblyobj.constraints_idx
-                         if self.new_leaf in assemblyobj.constraints_master[i].leaves and
-                                             assemblyobj.constraints_master[i].dist == 1])
+      drop_these = [i for i in assemblyobj.constraints_idx
+                   if self.new_leaf in assemblyobj.constraints_master[i].leaves and
+                                        assemblyobj.constraints_master[i].dist == 1]
+      assemblyobj.constraints_idx = filter(lambda x: x not in drop_these,
+                                                          assemblyobj.constraints_idx)
     else:
       assert all(set(c.clade.leaf_names)==set(assemblyobj.built_clades[c.index].leaf_names)
                                                             for c in self.clades)
-    assemblyobj.constraints_idx = filter(lambda x: x not in drop_these,
-                                         assemblyobj.constraints_idx)
+      new_clades_attr = [assemblyobj.built_clades.pop(c.index).wrapped for c in self.clades]
+    
+    assemblyobj.built_clades.append(T(Clade(clades=new_clades_attr)))
 
 
 class TreeAssembly(object):
