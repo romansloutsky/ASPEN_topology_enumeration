@@ -506,6 +506,10 @@ class TreeAssembly(object):
     return (new_pairs,
             self.filter_proposed_extensions(joins),
             self.filter_proposed_extensions(attachments))
+    
+  def build_extensions(self,new_pairs,joins,attachments):
+    # New pairs need to be constructed here - remember to remove pair constraints inconsistent with them!
+    pass
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
