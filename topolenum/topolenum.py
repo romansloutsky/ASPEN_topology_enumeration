@@ -304,10 +304,10 @@ class ProposedExtension(object):
       # the new leaf and each of the leaves in the built clade will be distance of leaf
       # in existing clade to its current root + 1 to account for the new root
       self.unverified = dict((frozenset({leaf,self.new_leaf}),
-                                     len(self.built_clade.clade.get_path(leaf))+1
-                                     )
+                                     self.built_clade.clade.trace_dist(leaf)+1
+                              )
                                     for leaf in self.built_clade.clade.leaf_names
-                                    )
+                             )
     else: # This extension is the joining of two built clades
       self.clades = sorted([child1,child2],key=lambda x: x.index,reverse=True)
       # When two built clades are joined, the resulting distance between any pair of leaves
@@ -318,7 +318,7 @@ class ProposedExtension(object):
                                      )
                                     for leafpair
                                     in itertools.product(*([(leaf,
-                                                             len(clade.clade.get_path(leaf))
+                                                             clade.clade.trace_dist(leaf)
                                                              )
                                                             for leaf in clade.clade.leaf_names
                                                             ]
