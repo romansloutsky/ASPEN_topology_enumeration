@@ -440,7 +440,7 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
-  def filter_proposed_extensions(self,extensions):
+  def verify_remaining_proposed_pairs(self,extensions):
     for key,ext in extensions.items():
       for pair,dist in ext.unverified.items():
         # Looking up pair histogram separately in case lookup throws KeyError,
