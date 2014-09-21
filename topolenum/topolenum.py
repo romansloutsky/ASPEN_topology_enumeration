@@ -478,7 +478,7 @@ class TreeAssembly(object):
     return new_pairs,joins,attachments
   
   def find_extensions(self,previously_seen={},min_score=None):
-    new_pairs = []
+    new_pairs = {}
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     already_connected = {frozenset(clade.leaf_names):i for i,clade in
@@ -495,7 +495,7 @@ class TreeAssembly(object):
       if pair.dist == 1:
         # Pairs with distance 1 are added w/o questions. If continue with this path,
         # later we will make sure to remove from consideration all pairs that conflict this.
-        new_pairs.append(pair)
+        new_pairs[pair.leaves] = pair
       elif not pair.leaves & already_connected_splat:
         # If a pair has distance > 1 and neither leaf in pair has already been added to a
         # clade, then we can't do anything with it, so we silently skip it
