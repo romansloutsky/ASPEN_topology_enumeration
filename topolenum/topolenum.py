@@ -465,7 +465,7 @@ class TreeAssembly(object):
     joins = self.verify_remaining_proposed_pairs(joins)
     attachments = self.verify_remaining_proposed_pairs(attachments)
     
-  def find_extensions(self):
+  def find_extensions(self,previously_seen,min_score=None):
     new_pairs = []
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
@@ -508,7 +508,7 @@ class TreeAssembly(object):
               new_leaf = leaf
           # And put the pair into the corresponding attachment's ProposedExtension object
           attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair,i)
-    return self.filter_proposed_extensions(new_pairs,joins,attachments)
+    return self.filter_proposed_extensions(new_pairs,joins,attachments,previously_seen,min_score)
     
   def build_extensions(self,new_pairs,joins,attachments):
     # New pairs need to be constructed here - remember to remove pair constraints inconsistent with them!
