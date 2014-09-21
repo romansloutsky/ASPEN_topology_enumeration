@@ -465,6 +465,17 @@ class TreeAssembly(object):
     joins = self.verify_remaining_proposed_pairs(joins)
     attachments = self.verify_remaining_proposed_pairs(attachments)
     
+    for extension_set in (new_pairs,joins.attachments):
+      for key,extension in extension_set.items():
+        if min_score is not None:
+          try: # Will fail is item is a new pair - forgiveness faster than permission
+            if extension[1].score + self.score < min_score:
+              extension_set.pop(key)
+              continue
+          except AttributeError: # Must be a new_pair:
+            if math.log(extension.freq) + self.score < min_score:
+              extension_set.pop(key)
+              continue
     # Order of further checks:
     # 1. Is min_score defined? Do remaining proposed extensions meet it?
     # 2. Are remaining proposed extensions in previously_seen?
