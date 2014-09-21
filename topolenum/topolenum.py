@@ -367,7 +367,7 @@ class ProposedExtension(object):
       built_clade = assemblyobj.built_clades.pop(self.built_clade.index)
       assert set(self.built_clade.clade.leaf_names) == set(built_clade.leaf_names)
       new_clades_attr = [built_clade.wrapped,Clade(name=self.new_leaf)]
-      # One more thing to if this extension is an attachment of a new leaf:
+      # One more thing to do if this extension is an attachment of a new leaf:
       # Pop constraint pairdists where the new leaf has distance 1 with any other leaf,
       # regardless of whether the other leaf is involved in this extension. All such
       # constraint distances are inconsistent with this extension. This additional check
@@ -460,6 +460,11 @@ class TreeAssembly(object):
           ext.unverified.pop(pair)
     return extensions
   
+  def filter_proposed_extensions(self,new_pairs,joins,attachments,
+                                 previously_seen,min_score=None):
+    joins = self.verify_remaining_proposed_pairs(joins)
+    attachments = self.verify_remaining_proposed_pairs(attachments)
+    
   def find_extensions(self):
     new_pairs = []
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
