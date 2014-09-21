@@ -508,9 +508,7 @@ class TreeAssembly(object):
               new_leaf = leaf
           # And put the pair into the corresponding attachment's ProposedExtension object
           attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair,i)
-    return (new_pairs,
-            self.filter_proposed_extensions(joins),
-            self.filter_proposed_extensions(attachments))
+    return self.filter_proposed_extensions(new_pairs,joins,attachments)
     
   def build_extensions(self,new_pairs,joins,attachments):
     # New pairs need to be constructed here - remember to remove pair constraints inconsistent with them!
