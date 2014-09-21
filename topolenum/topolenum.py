@@ -460,34 +460,6 @@ class TreeAssembly(object):
           ext.unverified.pop(pair)
     return extensions
   
-  def filter_proposed_extensions(self,new_pairs,joins,attachments,
-                                 previously_seen,min_score=None):
-    joins = self.verify_remaining_proposed_pairs(joins)
-    attachments = self.verify_remaining_proposed_pairs(attachments)
-    
-    for extension_set in (new_pairs,joins,attachments):
-      for key,extension in extension_set.items():
-        if min_score is not None:
-          try: # Will fail is item is a new pair - forgiveness faster than permission
-            if extension[1].score + self.score < min_score:
-              extension_set.pop(key)
-              continue
-          except AttributeError: # Must be a new_pair:
-            if math.log(extension.freq) + self.score < min_score:
-              extension_set.pop(key)
-              continue
-    # Order of further checks:
-    # 1. Is min_score defined? Do remaining proposed extensions meet it?
-    # 2. Are remaining proposed extensions in previously_seen?
-    #    If yes, abandon, if not, add.
-    # 3. Are remaining proposed extensions viable via look_ahead?
-    #    This includes BOTH future score comparison to min_score and check whether
-    #    extension of this extension to full tree is possible. Since the first
-    #    requires min_score to be defined, while the second can always be performed,
-    #    maybe they should be split?
-    
-    return new_pairs,joins,attachments
-  
   def as_nested_sets(self,extension):
     # Clades are represented by {clade.nested_set_repr(),'r'} (r for root) to indicate
     # their free-standing nature. This way {{clade1,'r'},{clade2,'r'}} represents two
@@ -516,6 +488,42 @@ class TreeAssembly(object):
     old_clades = frozenset(c for i,c in enumerate(current_clades)
                            if i not in indeces_to_skip)
     return frozenset({new_clade,old_clades})
+  
+  def filter_proposed_extensions(self,new_pairs,joins,attachments,
+                                 previously_seen,min_score=None):
+    joins = self.verify_remaining_proposed_pairs(joins)
+    attachments = self.verify_remaining_proposed_pairs(attachments)
+    
+    for extension_set in (new_pairs,joins,attachments):
+      for key,extension in extension_set.items():
+        # First filter: has extension been encountered before?
+        ext_nested_set_repr = self.as_nested_sets(extension)
+        if ext_nested_set_repr in previously_seen:
+          extension.pop(key)
+          continue
+        else:
+          previously_seen.add(ext_nested_set_repr)
+        # Second filter: is score with extension already worse than min_score?
+        if min_score is not None:
+          try: # Will fail is item is a new pair - forgiveness faster than permission
+            if extension[1].score + self.score < min_score:
+              extension_set.pop(key)
+              continue
+          except AttributeError: # Must be a new_pair:
+            if math.log(extension.freq) + self.score < min_score:
+              extension_set.pop(key)
+              continue
+    # Order of further checks:
+    # 1. Is min_score defined? Do remaining proposed extensions meet it?
+    # 2. Are remaining proposed extensions in previously_seen?
+    #    If yes, abandon, if not, add.
+    # 3. Are remaining proposed extensions viable via look_ahead?
+    #    This includes BOTH future score comparison to min_score and check whether
+    #    extension of this extension to full tree is possible. Since the first
+    #    requires min_score to be defined, while the second can always be performed,
+    #    maybe they should be split?
+    
+    return new_pairs,joins,attachments
   
   def find_extensions(self,previously_seen=set(),min_score=None):
     new_pairs = {}
