@@ -509,7 +509,21 @@ class TreeAssembly(object):
     
   def build_extensions(self,new_pairs,joins,attachments):
     # New pairs need to be constructed here - remember to remove pair constraints inconsistent with them!
-    pass
+    all_ext_to_build = new_pairs.values()+joins.values()+attachments.values()
+    updated_assemblies = []
+    while all_ext_to_build:
+      extension = all_ext_to_build.pop()
+      try:
+        if not all_ext_to_build:
+          updated_assemblies.append(extension.build_extension(self,in_place=True))
+        else:
+          updated_assemblies.append(extension.build_extension(self))
+      except AttributeError:
+        if not all_ext_to_build:
+          build_in = self
+        else:
+          build_in = copy.deepcopy(self)
+    
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
