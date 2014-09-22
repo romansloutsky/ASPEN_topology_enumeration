@@ -490,32 +490,37 @@ class TreeAssembly(object):
     return frozenset({new_clade,old_clades})
   
   def best_case_with_extension(self,extension):
-    current_distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
+    if not hasattr(self,'_distances_to_root'):
+      self._distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
                                  for leaf in clade.leaf_names}
-    pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
-                           for pair in itertools.combinations(clade.leaf_names,2)}
+    if not hasattr(self,'_pairs_accounted_for'):
+      self._pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
+                                   for pair in itertools.combinations(clade.leaf_names,2)}
     try:
-      new_distances_to_root = {leaf:(current_distances_to_root[leaf]+1 if leaf in
-                                     current_distances_to_root else 1)
+      updated_distances_to_root = {leaf:(self._distances_to_root[leaf]+1 if leaf in
+                                         self._distances_to_root else 1)
                                for pair in extension.consistent for leaf in pair}
-      for leaf in current_distances_to_root:
-        if leaf not in new_distances_to_root:
-          new_distances_to_root[leaf] = current_distances_to_root[leaf]
-      for pair in extension.consistent:
-        pairs_accounted_for.add(pair)
+      for leaf in self._distances_to_root:
+        if leaf not in updated_distances_to_root:
+          updated_distances_to_root[leaf] = self._distances_to_root[leaf]
+      
+      updated_pairs_accounted_for = {pair for pair in
+                                     itertools.chain(self._pairs_accounted_for,
+                                                     extension.consistent.iterkeys())}
     except AttributeError:
-      new_distances_to_root = dict(current_distances_to_root.iteritems())
+      updated_distances_to_root = dict(self._distances_to_root.iteritems())
       for leaf in extension.leaves:
-        new_distances_to_root[leaf] = 1
-      pairs_accounted_for.add(extension.leaves)
+        updated_distances_to_root[leaf] = 1
+      updated_pairs_accounted_for = {pair for pair in self._pairs_accounted_for}
+      updated_pairs_accounted_for.add(extension.leaves)
     
     try:
       best_possible_final_score = self.score + extension.score
     except AttributeError:
       best_possible_final_score = self.score + math.log(extension.freq)
     for pair,histogram in self.pwdist_histograms_dict.items():
-      if pair not in pairs_accounted_for:
-        min_dist = sum(new_distances_to_root[leaf] if leaf in new_distances_to_root else
+      if pair not in updated_pairs_accounted_for:
+        min_dist = sum(updated_distances_to_root[leaf] if leaf in updated_distances_to_root else
                        0 for leaf in pair)+1
         acceptable_dist_freqs = [freq for dist,freq in histogram.items() if dist >= min_dist]
         if acceptable_dist_freqs:
