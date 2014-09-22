@@ -566,7 +566,7 @@ class TreeAssembly(object):
     
     return new_pairs,joins,attachments
   
-  def find_extensions(self,previously_seen=set(),min_score=None):
+  def find_extensions(self,previously_seen,min_score=None):
     new_pairs = {}
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
