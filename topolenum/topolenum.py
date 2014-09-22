@@ -534,7 +534,7 @@ class TreeAssembly(object):
         # First filter: has extension been encountered before?
         ext_nested_set_repr = self.as_nested_sets(extension)
         if ext_nested_set_repr in previously_seen:
-          extension.pop(key)
+          extension_set.pop(key)
           continue
         else:
           previously_seen.add(ext_nested_set_repr)
