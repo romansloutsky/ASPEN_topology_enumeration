@@ -548,6 +548,12 @@ class TreeAssembly(object):
             if math.log(extension.freq) + self.score < min_score:
               extension_set.pop(key)
               continue
+        # Third filter: is there a way to extend the extension all the way to a full assembly?
+        # Is the upper limit on best score for that assembly already worse than min_score?
+        best_case = self.best_case_with_extension(extension)
+        if best_case is None or best_case < min_score:
+          extension_set.pop(key)
+          continue
     # Order of further checks:
     # 1. Is min_score defined? Do remaining proposed extensions meet it?
     # 2. Are remaining proposed extensions in previously_seen?
