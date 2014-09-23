@@ -193,7 +193,7 @@ def assembly_iteration(assemblies,pairs_master,pwhistdict,accepted_assemblies,en
             if la is None:
                 discarded_this_iteration['e'].append(assemblies.pop(assemblies.index(assembly)))
                 encountered_leaf_subsets.add(frozenset({frozenset({frozenset(n.leaf_names) for n in T(c).get_nonterminals()}) for c in assembly[0]}))
-                still_in_play
+                still_in_play = False
             elif len(accepted_assemblies) == num_requested_trees and la < accepted_assemblies[-1][4]:
                 discarded_this_iteration['ps'].append(assemblies.pop(assemblies.index(assembly)))
                 encountered_leaf_subsets.add(frozenset({frozenset({frozenset(n.leaf_names) for n in T(c).get_nonterminals()}) for c in assembly[0]}))
