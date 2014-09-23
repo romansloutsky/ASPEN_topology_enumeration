@@ -608,14 +608,14 @@ class TreeAssembly(object):
   def build_extensions(self,new_pairs,joins,attachments):
     # Will need key of pair in new pairs, but not of keys in joins or attachments
     all_ext_to_build = new_pairs.items()+joins.values()+attachments.values()
-    updated_assemblies = []
+    extended_assemblies = []
     while all_ext_to_build:
       extension = all_ext_to_build.pop()
       try:
         if not all_ext_to_build:
-          updated_assemblies.append(extension.build_extension(self,in_place=True))
+          extended_assemblies.append(extension.build_extension(self,in_place=True))
         else:
-          updated_assemblies.append(extension.build_extension(self))
+          extended_assemblies.append(extension.build_extension(self))
       except AttributeError:
         if not all_ext_to_build:
           build_in = self
@@ -642,8 +642,8 @@ class TreeAssembly(object):
         # Build new clade and update the score
         build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
         build_in.score += math.log(pair.freq)
-        updated_assemblies.append(build_in)
-    return updated_assemblies
+        extended_assemblies.append(build_in)
+    return extended_assemblies
   
   def generate_extensions(self,encountered_assemblies,min_score=None):
     new_pairs,joins,attachments = self.find_extensions(encountered_assemblies,min_score=None)
