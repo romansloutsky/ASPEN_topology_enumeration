@@ -608,8 +608,8 @@ class TreeAssembly(object):
     return self.filter_proposed_extensions(new_pairs,joins,attachments,previously_seen,min_score)
     
   def build_extensions(self,new_pairs,joins,attachments):
-    # New pairs need to be constructed here - remember to remove pair constraints inconsistent with them!
-    all_ext_to_build = new_pairs.values()+joins.values()+attachments.values()
+    # Will need key of pair in new pairs, but not of keys in joins or attachments
+    all_ext_to_build = new_pairs.items()+joins.values()+attachments.values()
     updated_assemblies = []
     while all_ext_to_build:
       extension = all_ext_to_build.pop()
@@ -623,7 +623,19 @@ class TreeAssembly(object):
           build_in = self
         else:
           build_in = copy.deepcopy(self)
-    
+        idx_of_pair,pair = extension # Now we can get the key (index of pair in constraints_idx)
+        
+        # Select for dropping all pairs with distance 1 and one member of pair - they can't
+        # have distance 1 with anyone except each other
+        drop_these = [i for i in self.constraints_idx if self.constraints_master[i].dist == 1 and
+                                              self.constraints_master[i].leaves & pair.leaves and
+                                            not self.constraints_master[i].leaves == pair.leaves]
+        # Select for dropping all pairs of these two leaves with distance > 1
+        drop_these.extend(i for i in self.constraints_idx if self.constraints_master[i].dist > 1
+                                            and self.constraints_master[i].leaves == pair.leaves)
+        drop_these.append(idx_of_pair) # Finally, select for dropping this pair
+        # Drop selected pairs from constraints_idx
+        build_in.constraints_idx = filter(lambda x: x not in drop_these,build_in.constraints_idx)
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
