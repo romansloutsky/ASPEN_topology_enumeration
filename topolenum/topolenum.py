@@ -636,6 +636,12 @@ class TreeAssembly(object):
         drop_these.append(idx_of_pair) # Finally, select for dropping this pair
         # Drop selected pairs from constraints_idx
         build_in.constraints_idx = filter(lambda x: x not in drop_these,build_in.constraints_idx)
+        
+        # Build new clade and update the score
+        build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
+        build_in.score += math.log(pair.freq)
+        updated_assemblies.append(build_in)
+    return updated_assemblies
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
