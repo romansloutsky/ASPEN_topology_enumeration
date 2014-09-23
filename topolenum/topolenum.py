@@ -528,7 +528,7 @@ class TreeAssembly(object):
     return best_possible_final_score
   
   def filter_proposed_extensions(self,new_pairs,joins,attachments,
-                                 previously_seen,min_score=None):
+                                 encountered,min_score=None):
     joins = self.verify_remaining_proposed_pairs(joins)
     attachments = self.verify_remaining_proposed_pairs(attachments)
     
@@ -536,11 +536,11 @@ class TreeAssembly(object):
       for key,extension in extension_set.items():
         # First filter: has extension been encountered before?
         ext_nested_set_repr = self.as_nested_sets(extension)
-        if ext_nested_set_repr in previously_seen:
+        if ext_nested_set_repr in encountered:
           extension_set.pop(key)
           continue
         else:
-          previously_seen.add(ext_nested_set_repr)
+          encountered.add(ext_nested_set_repr)
         # Second filter: is score with extension already worse than min_score?
         if min_score is not None:
           try: # Will fail is item is a new pair - forgiveness faster than permission
@@ -560,7 +560,7 @@ class TreeAssembly(object):
     
     return new_pairs,joins,attachments
   
-  def find_extensions(self,previously_seen,min_score=None):
+  def find_extensions(self,encountered,min_score=None):
     new_pairs = {}
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
@@ -603,7 +603,7 @@ class TreeAssembly(object):
               new_leaf = leaf
           # And put the pair into the corresponding attachment's ProposedExtension object
           attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair,i)
-    return self.filter_proposed_extensions(new_pairs,joins,attachments,previously_seen,min_score)
+    return self.filter_proposed_extensions(new_pairs,joins,attachments,encountered,min_score)
     
   def build_extensions(self,new_pairs,joins,attachments):
     # Will need key of pair in new pairs, but not of keys in joins or attachments
