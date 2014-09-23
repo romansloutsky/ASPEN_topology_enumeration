@@ -393,7 +393,8 @@ class TreeAssembly(object):
       self[key] = self.default_factory(key)
       return self[key]
   
-  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,absolute_freq_cutoff=0.01):
+  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
+               absolute_freq_cutoff=0.01):
     #===========================================================================
     # The data attributes below will are set on the class, not in instances,
     # meaning they will be shared between all instances of this class, saving
@@ -415,7 +416,8 @@ class TreeAssembly(object):
                     sum(d[1] for d in distances[:i]) < constraint_freq_cutoff]
           ) for leafpair,distances in pwleafdist_histograms]
                                             for score in pair_histogram[1]],
-                                           key=lambda x: (x.dist,1-x.freq) # sorted on (shortest dist, highest freq)
+                                           # sorted on (shortest dist, highest freq)
+                                           key=lambda x: (x.dist,1-x.freq)
                                                  )
                                           )
     
