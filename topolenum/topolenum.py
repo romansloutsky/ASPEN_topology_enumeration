@@ -696,20 +696,22 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
                            iternum):
   added_this_iteration = 0
   completed_this_iteration = 0
-  discarded_this_iteration = Counter()
+  discarded_this_iteration = 0
   
   work_on_this_iteration = prepare_assemblies_for_iteration(accepted_assemblies, num_requested_trees,
                                                             assemblies_workspace, processing_bite_size,
                                                             iternum)
   
-  print >>stderr, len(assemblies_workspace),"tracked trees,",len(completed_assemblies),"completed, working on",\
-                  len(work_on_this_iteration),"this iteration, total of",\
-                  len(assemblies_workspace)-len(accepted_assemblies)+len(completed_assemblies),"are incomplete"
+  print >>stderr,"On iteration",iternum+1
+  print >>stderr,len(assemblies_workspace),"tracked trees,",len(completed_assemblies),"completed, working on",\
+                 len(work_on_this_iteration),"this iteration, total of",\
+                 len(assemblies_workspace)-len(accepted_assemblies)+len(completed_assemblies),"are incomplete"
   
   assemblies_per_dot = int(math.ceil(float(len(work_on_this_iteration))/50))
+  drop_these_from_workspace = []
   for i,assembly in enumerate(work_on_this_iteration):
     print >>stderr,'['+'|'*(i % 10)+' '*(9-(i % 10))+']'+'['+'*'*(i/assemblies_per_dot)+' '*(50-i/assemblies_per_dot)+']'+\
-                        '\taccepted:',accepted_this_iteration,'discarded:',sum(v for v in discarded_this_iteration.values()),\
+                        '\tcompleted:',completed_this_iteration,'discarded:',discarded_this_iteration,\
                         'new:',added_this_iteration,'\r',
     
     if len(accepted_assemblies) >= num_requested_trees:
@@ -717,26 +719,47 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
                                                          min_score=accepted_assemblies[-1].score)
     else:
       extended_assemblies = assembly.generate_extensions(encountered_assemblies)
+    if extended_assemblies is None:
+      discarded_this_iteration += 1
+      drop_these_from_workspace.append(assembly)
+      continue
+    else:
+      assert assembly is extended_assemblies[-1]
     
-    added_this_iteration += len(extended_assemblies)-1
     drop_these = []
     for j,ext_assembly in enumerate(extended_assemblies):
       if ext_assembly.complete:
         completed_this_iteration += 1
         drop_these.append(j)
+        if ext_assembly is assembly:
+          drop_these_from_workspace.append(i)
         accepted_assemblies.append(ext_assembly)
         accepted_assemblies = sorted(accepted_assemblies,key=lambda x: x.score,reverse=True)
         if len(accepted_assemblies) > num_requested_trees:
           assert len(accepted_assemblies)-1 == num_requested_trees
           completed_assemblies.append(accepted_assemblies.pop())
+      elif ext_assembly is not assembly:
+        assemblies_workspace.append(ext_assembly)
+        added_this_iteration += 1
+      else:
+        continue
     for j in drop_these[::-1]:
       extended_assemblies.pop(j)
-    
-    if extended_assemblies:
-      if extended_assemblies[-1] is assembly:
-        assemblies_workspace.extend(extended_assemblies[:-1])
-      else:
-        assemblies_workspace.extend(extended_assemblies)
+  
+  for i in drop_these_from_workspace[::-1]:
+    assemblies_workspace.pop(i)
+  
+  print >>stderr,' '*110+'\r',
+  if completed_this_iteration:
+    print >>stderr,'\t',completed_this_iteration,"were completed this iteration"
+  if added_this_iteration:
+    print >>stderr,'\t',added_this_iteration,"were added to the workspace this iteration"
+  if discarded_this_iteration:
+    print >>stderr,'\t',discarded_this_iteration,"were discarded from the workspace this iteration"
+  if accepted_assemblies:
+    print >>stderr,'\t'+"Best accepted score after this iteration is",accepted_assemblies[0].score
+    print >>stderr,'\t'+"Worst accepted score after this iteration is",accepted_assemblies[-1].score
+  print >>stderr,'\t',len(encountered_assemblies),"unique assemblies have been encountered"
   
   return accepted_assemblies
     
@@ -753,14 +776,26 @@ def assemble_trees(pwleafdist_histograms,leaves_to_assemble,num_requested_trees=
   iterations = 0
   enough_assemblies_accepted = False
   while assemblies_workspace and iterations < num_iter:
-    assembly_iteration_new()
-    # Some handling of completed assemblies needs to happen
+    updated_accepted_assemblies = assembly_iteration_new(assemblies_workspace,completed_assemblies,
+                                                         accepted_assemblies,encountered_assemblies,
+                                                         num_requested_trees,processing_bite_size,
+                                                         iterations)
+    if updated_accepted_assemblies is not accepted_assemblies:
+      accepted_assemblies = updated_accepted_assemblies
     
     # Did we reach the requested number of assemblies on this iteration?
-    if not enough_assemblies_accepted and len(completed_assemblies) >= num_requested_trees:
-      
+    if not enough_assemblies_accepted and len(accepted_assemblies) >= num_requested_trees:
+      # If yes, we should remove from the workspace assemblies that, unfinished, already have worse
+      # scores than the worst accepted assembly
+      prev_workspace_length = len(assemblies_workspace)
+      assemblies_workspace = filter(lambda x: x.score > accepted_assemblies[-1].score,
+                                    assemblies_workspace)
+      print >>stderr,"*** Reached",num_requested_trees,"accepted trees, dumping",\
+                      prev_workspace_length - len(assemblies_workspace),\
+                      "assemblies with scores worse than the worst accepted tree ***"
       enough_assemblies_accepted = True
     iterations += 1
+  return assemblies_workspace,accepted_assemblies
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
