@@ -721,7 +721,7 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
       extended_assemblies = assembly.generate_extensions(encountered_assemblies)
     if extended_assemblies is None:
       discarded_this_iteration += 1
-      drop_these_from_workspace.append(assembly)
+      drop_these_from_workspace.append(i)
       continue
     else:
       assert assembly is extended_assemblies[-1]
