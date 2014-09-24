@@ -648,7 +648,7 @@ class TreeAssembly(object):
     return updated_assemblies
   
   def generate_extensions(self,encountered_assemblies,min_score=None):
-    new_pairs,joins,attachments = self.find_extensions(encountered_assemblies,min_score=None)
+    new_pairs,joins,attachments = self.find_extensions(encountered_assemblies,min_score)
     if any((new_pairs,joins,attachments)):
       # Return built extensions and any additional information
       return self.build_extensions(new_pairs, joins, attachments)
