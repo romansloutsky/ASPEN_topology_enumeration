@@ -703,9 +703,10 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
                                                             iternum)
   
   print >>stderr,"On iteration",iternum+1
-  print >>stderr,len(assemblies_workspace),"tracked trees,",len(completed_assemblies),"completed, working on",\
+  print >>stderr,len(assemblies_workspace)+len(accepted_assemblies)+len(completed_assemblies),\
+                 "total assemblies,",len(completed_assemblies),"completed, working on",\
                  len(work_on_this_iteration),"this iteration, total of",\
-                 len(assemblies_workspace)-len(accepted_assemblies)+len(completed_assemblies),"are incomplete"
+                 len(assemblies_workspace),"are incomplete"
   
   assemblies_per_dot = int(math.ceil(float(len(work_on_this_iteration))/50))
   drop_these_from_workspace = []
