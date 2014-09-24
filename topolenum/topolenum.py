@@ -689,7 +689,7 @@ def prepare_assemblies_for_iteration(accepted_assemblies,num_requested_trees,ass
       else:
         return sorted(assemblies_workspace,key=special_sort2)[:processing_bite_size]
   else:
-    return assemblies_workspace
+    return [a for a in assemblies_workspace]
 
 def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_assemblies,
                            encountered_assemblies,num_requested_trees,processing_bite_size,
