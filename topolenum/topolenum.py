@@ -436,6 +436,10 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
+  @property
+  def complete(self):
+    return len(self.built_clades) == 1 and not self.free_leaves
+  
   def verify_remaining_proposed_pairs(self,extensions):
     for key,ext in extensions.items():
       for pair,dist in ext.unverified.items():
