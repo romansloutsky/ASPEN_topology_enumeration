@@ -161,14 +161,20 @@ class TreeAssembly(object):
   
   def recompute(self):
     self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
+  def recompute(self,*args):
+    if not args or '_nested_set_reprs' in args:
+      self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
+  
+  def _property_getter(self,property):
+    try:
+      return getattr(self,property)
+    except AttributeError:
+      self.recompute(property)
+      return getattr(self,property)
   
   @property
   def current_clades_as_nested_sets(self):
-    try:
-      return self._nested_set_reprs
-    except AttributeError:
-      self.recompute()
-      return self._nested_set_reprs
+    return self._property_getter('_nested_set_reprs')
   
   @property
   def complete(self):
