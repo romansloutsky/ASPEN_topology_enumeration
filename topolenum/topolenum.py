@@ -159,9 +159,13 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
-  def recompute(self):
-    self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
   def recompute(self,*args):
+    if not args or '_distances_to_root' in args:
+      self._distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
+                                 for leaf in clade.leaf_names}
+    if not args or '_pairs_accounted_for' in args:
+      self._pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
+                                   for pair in itertools.combinations(clade.leaf_names,2)}
     if not args or '_nested_set_reprs' in args:
       self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
   
@@ -175,6 +179,14 @@ class TreeAssembly(object):
   @property
   def current_clades_as_nested_sets(self):
     return self._property_getter('_nested_set_reprs')
+  
+  @property
+  def distances_to_root(self):
+    return self._property_getter('_distances_to_root')
+  
+  @property
+  def pairs_accounted_for(self):
+    return self._property_getter('_pairs_accounted_for')
   
   @property
   def complete(self):
@@ -229,28 +241,22 @@ class TreeAssembly(object):
     return old_clades|frozenset({new_clade})
   
   def best_case_with_extension(self,extension):
-    if not hasattr(self,'_distances_to_root'):
-      self._distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
-                                 for leaf in clade.leaf_names}
-    if not hasattr(self,'_pairs_accounted_for'):
-      self._pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
-                                   for pair in itertools.combinations(clade.leaf_names,2)}
     try:
-      updated_distances_to_root = {leaf:(self._distances_to_root[leaf]+1 if leaf in
-                                         self._distances_to_root else 1)
+      updated_distances_to_root = {leaf:(self.distances_to_root[leaf]+1 if leaf in
+                                         self.distances_to_root else 1)
                                for pair in extension.consistent for leaf in pair}
-      for leaf in self._distances_to_root:
+      for leaf in self.distances_to_root:
         if leaf not in updated_distances_to_root:
-          updated_distances_to_root[leaf] = self._distances_to_root[leaf]
+          updated_distances_to_root[leaf] = self.distances_to_root[leaf]
       
       updated_pairs_accounted_for = {pair for pair in
-                                     itertools.chain(self._pairs_accounted_for,
+                                     itertools.chain(self.pairs_accounted_for,
                                                      extension.consistent.iterkeys())}
     except AttributeError:
-      updated_distances_to_root = dict(self._distances_to_root.iteritems())
+      updated_distances_to_root = dict(self.distances_to_root.iteritems())
       for leaf in extension.leaves:
         updated_distances_to_root[leaf] = 1
-      updated_pairs_accounted_for = {pair for pair in self._pairs_accounted_for}
+      updated_pairs_accounted_for = {pair for pair in self.pairs_accounted_for}
       updated_pairs_accounted_for.add(extension.leaves)
     
     try:
