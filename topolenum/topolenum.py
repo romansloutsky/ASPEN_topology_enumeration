@@ -102,6 +102,7 @@ class ProposedExtension(object):
                                          assemblyobj.constraints_idx)
     
     assemblyobj.built_clades.append(T(Clade(clades=new_clades_attr)))
+    assemblyobj.recompute()
     assemblyobj.score += self.score
     return assemblyobj
 
@@ -158,6 +159,17 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
+  def recompute(self):
+    self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
+  
+  @property
+  def current_clades_as_nested_sets(self):
+    try:
+      return self._nested_set_reprs
+    except AttributeError:
+      self.recompute()
+      return self._nested_set_reprs
+  
   @property
   def complete(self):
     return len(self.built_clades) == 1 and not self.free_leaves
@@ -205,14 +217,8 @@ class TreeAssembly(object):
                              'r'})
       indeces_to_skip = {c.index for c in extension.clades}
     
-    try:
-      current_clades = self._nested_set_reprs
-    except AttributeError:
-      self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'})
-                                for c in self.built_clades]
-      current_clades = self._nested_set_reprs
     
-    old_clades = frozenset(c for i,c in enumerate(current_clades)
+    old_clades = frozenset(c for i,c in enumerate(self.current_clades_as_nested_sets)
                            if i not in indeces_to_skip)
     return frozenset({new_clade,old_clades})
   
@@ -370,6 +376,7 @@ class TreeAssembly(object):
         
         # Build new clade and update the score
         build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
+        build_in.recompute()
         build_in.score += math.log(pair.freq)
         updated_assemblies.append(build_in)
     return updated_assemblies
