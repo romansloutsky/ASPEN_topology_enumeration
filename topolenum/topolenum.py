@@ -273,7 +273,7 @@ class TreeAssembly(object):
         # Second filter: is score with extension already worse than min_score?
         if min_score is not None:
           try: # Will fail is item is a new pair - forgiveness faster than permission
-            if extension[1].score + self.score < min_score:
+            if extension.score + self.score < min_score:
               extension_set.pop(key)
               continue
           except AttributeError: # Must be a new_pair:
