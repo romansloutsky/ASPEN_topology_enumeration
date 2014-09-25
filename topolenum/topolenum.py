@@ -220,7 +220,7 @@ class TreeAssembly(object):
     
     old_clades = frozenset(c for i,c in enumerate(self.current_clades_as_nested_sets)
                            if i not in indeces_to_skip)
-    return frozenset({new_clade,old_clades})
+    return old_clades|frozenset({new_clade})
   
   def best_case_with_extension(self,extension):
     if not hasattr(self,'_distances_to_root'):
