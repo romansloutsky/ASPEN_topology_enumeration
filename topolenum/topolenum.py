@@ -50,6 +50,7 @@ class ProposedExtension(object):
                                     )
     self.consistent = {}
     self.inconsistent = {}
+    self.verified = set()
     self.score = 0.0
   
   def check_pair(self,pair,i):
@@ -63,7 +64,9 @@ class ProposedExtension(object):
     else: # If it hasn't been added to consistent ...
       if pair.dist == self.unverified[pair.leaves]: # ... and its distance matches expected
         self.consistent[pair.leaves] = self.IndexedPair(i,pair) # it goes into consistent
-        self.unverified.pop(pair.leaves) # and is "verified", so pop it from unverified
+        # and is "verified", so pop it from unverified and add to verified
+        self.unverified.pop(pair.leaves)
+        self.verified.add(pair.leaves)
         self.score += math.log(pair.freq)
       else: # ... and its distance doesn't match expected
         self.inconsistent[i] = pair # it goes into inconsistent ...
@@ -210,6 +213,7 @@ class TreeAssembly(object):
         else:
           ext.score += math.log(pair_freq)
           ext.unverified.pop(pair)
+          ext.verified.add(pair)
       else:
         # If all unverified pairs check out, make sure this extension is not passing
         # this filter entirely on the strength of pairs we just verified
@@ -251,7 +255,7 @@ class TreeAssembly(object):
       
       updated_pairs_accounted_for = {pair for pair in
                                      itertools.chain(self.pairs_accounted_for,
-                                                     extension.consistent.iterkeys())}
+                                                     extension.verified)}
     except AttributeError:
       updated_distances_to_root = dict(self.distances_to_root.iteritems())
       for leaf in extension.leaves:
