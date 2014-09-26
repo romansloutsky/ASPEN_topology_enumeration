@@ -248,7 +248,9 @@ class TreeAssembly(object):
     try:
       updated_distances_to_root = {leaf:(self.distances_to_root[leaf]+1 if leaf in
                                          self.distances_to_root else 1)
-                               for pair in extension.consistent for leaf in pair}
+                               for pair in itertools.chain(extension.consistent,
+                                                           extension.verified)
+                               for leaf in pair}
       for leaf in self.distances_to_root:
         if leaf not in updated_distances_to_root:
           updated_distances_to_root[leaf] = self.distances_to_root[leaf]
