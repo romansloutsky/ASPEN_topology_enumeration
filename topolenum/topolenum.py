@@ -162,6 +162,17 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
+  def __deepcopy__(self,memodict={}):
+    copy_of_self = type(self).__new__(type(self))
+    copy_of_self._nested_set_reprs = [r for r in self._nested_set_reprs]
+    copy_of_self._distances_to_root = {k:v for k,v in self._distances_to_root.iteritems()}
+    copy_of_self.free_leaves = {fl for fl in self.free_leaves}
+    copy_of_self.score = self.score
+    copy_of_self._pairs_accounted_for = {p for p in self._pairs_accounted_for}
+    copy_of_self.built_clades = [bc for bc in self.built_clades]
+    copy_of_self.constraints_idx = [c for c in self.constraints_idx]
+    return copy_of_self
+  
   def recompute(self,*args):
     if not args or '_distances_to_root' in args:
       self._distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
