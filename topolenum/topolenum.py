@@ -454,9 +454,10 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
                                                             assemblies_workspace, processing_bite_size,
                                                             iternum)
   
-  print >>stderr,"On iteration",iternum+1
-  print >>stderr,len(assemblies_workspace)+len(accepted_assemblies)+len(completed_assemblies),\
-                 "total assemblies,",len(completed_assemblies),"completed, working on",\
+  print >>stderr,"On iteration",iternum+1," -",len(assemblies_workspace)+len(accepted_assemblies)+len(completed_assemblies),\
+                  "TOTAL total assemblies"
+  print >>stderr,len(assemblies_workspace)+len(accepted_assemblies),\
+                 "total assemblies,",len(accepted_assemblies)+len(completed_assemblies),"completed, working on",\
                  len(work_on_this_iteration),"this iteration, total of",\
                  len(assemblies_workspace),"are incomplete"
   
@@ -495,9 +496,9 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
         assemblies_workspace.append(ext_assembly)
         added_this_iteration += 1
       else:
-        continue
-    for j in drop_these[::-1]:
-      extended_assemblies.pop(j)
+        assert j == len(extended_assemblies)-1
+#     for j in drop_these[::-1]:
+#       extended_assemblies.pop(j)
   
   for i in drop_these_from_workspace[::-1]:
     assemblies_workspace.pop(assemblies_workspace.index(work_on_this_iteration[i]))
