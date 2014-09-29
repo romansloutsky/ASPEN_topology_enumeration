@@ -500,7 +500,7 @@ def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_as
       extended_assemblies.pop(j)
   
   for i in drop_these_from_workspace[::-1]:
-    assemblies_workspace.pop(i)
+    assemblies_workspace.pop(assemblies_workspace.index(work_on_this_iteration[i]))
   
   print >>stderr,' '*110+'\r',
   if completed_this_iteration:
