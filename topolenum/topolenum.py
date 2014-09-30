@@ -1,4 +1,4 @@
-import copy,math,itertools
+import math,itertools
 from sys import stderr
 from collections import defaultdict,namedtuple,Counter
 from Bio.Phylo.BaseTree import Tree, Clade
@@ -74,7 +74,8 @@ class ProposedExtension(object):
   
   def build_extension(self,assemblyobj,in_place=False):
     if not in_place:
-      assemblyobj = copy.deepcopy(assemblyobj)
+      assemblyobj = assemblyobj.copy()
+#       assemblyobj = copy.deepcopy(assemblyobj)
     assert not self.unverified
     
     # Assemble for removal from constraints_idx indeces of consistent and inconsistent pairdists
@@ -162,7 +163,7 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
-  def __deepcopy__(self,memodict={}):
+  def copy(self):
     copy_of_self = type(self).__new__(type(self))
     copy_of_self._nested_set_reprs = [r for r in self._nested_set_reprs]
     copy_of_self._distances_to_root = {k:v for k,v in self._distances_to_root.iteritems()}
@@ -384,7 +385,8 @@ class TreeAssembly(object):
         if not all_ext_to_build:
           build_in = self
         else:
-          build_in = copy.deepcopy(self)
+          build_in = self.copy()
+#           build_in = copy.deepcopy(self)
         idx_of_pair,pair = extension # Now we can get the key (index of pair in constraints_idx)
         
         # Select for dropping all pairs with distance 1 and one member of pair - they can't
