@@ -241,16 +241,16 @@ class TreeAssembly(object):
     if hasattr(extension,'freq'):
       new_clade = frozenset({frozenset(extension.leaves),'r'})
       indeces_to_skip = []
-    elif hasattr(extension,'built_clade'):
-      new_clade = frozenset({frozenset({extension.built_clade.clade.nested_set_repr(),
-                                        extension.new_leaf}),'r'})
-      indeces_to_skip = {extension.built_clade.index}
     else:
-      new_clade = frozenset({frozenset(c.clade.nested_set_repr()
-                                       for c in extension.clades),
-                             'r'})
-      indeces_to_skip = {c.index for c in extension.clades}
-    
+      if hasattr(extension,'built_clade'):
+        new_clade = frozenset({frozenset({extension.built_clade.clade.nested_set_repr(),
+                                          extension.new_leaf}),'r'})
+        indeces_to_skip = {extension.built_clade.index}
+      else:
+        new_clade = frozenset({frozenset(c.clade.nested_set_repr()
+                                         for c in extension.clades),
+                               'r'})
+        indeces_to_skip = {c.index for c in extension.clades}
     
     old_clades = frozenset(c for i,c in enumerate(self.current_clades_as_nested_sets)
                            if i not in indeces_to_skip)
