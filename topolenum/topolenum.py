@@ -106,7 +106,7 @@ class ProposedExtension(object):
                                          assemblyobj.constraints_idx)
     
     assemblyobj.built_clades.append(T(Clade(clades=new_clades_attr)))
-    assemblyobj.recompute()
+    assemblyobj.recompute(extension=self)
     assemblyobj.score += self.score
     return assemblyobj
 
@@ -407,7 +407,7 @@ class TreeAssembly(object):
         
         # Build new clade and update the score
         build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
-        build_in.recompute()
+        build_in.recompute(extension=pair)
         build_in.score += math.log(pair.freq)
         updated_assemblies.append(build_in)
     return updated_assemblies
