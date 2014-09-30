@@ -251,6 +251,9 @@ class TreeAssembly(object):
                                          for c in extension.clades),
                                'r'})
         indeces_to_skip = {c.index for c in extension.clades}
+      extension.nested_set_reprs = [c for i,c in enumerate(self.current_clades_as_nested_sets)
+                                    if i not in indeces_to_skip]
+      extension.nested_set_reprs.append(new_clade)
     
     old_clades = frozenset(c for i,c in enumerate(self.current_clades_as_nested_sets)
                            if i not in indeces_to_skip)
