@@ -270,6 +270,8 @@ class TreeAssembly(object):
       updated_pairs_accounted_for = {pair for pair in
                                      itertools.chain(self.pairs_accounted_for,
                                                      extension.verified)}
+      extension.distances_to_root = updated_distances_to_root
+      extension.pairs_accounted_for = updated_pairs_accounted_for
     except AttributeError:
       updated_distances_to_root = dict(self.distances_to_root.iteritems())
       for leaf in extension.leaves:
