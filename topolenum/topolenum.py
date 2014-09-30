@@ -174,15 +174,27 @@ class TreeAssembly(object):
     copy_of_self.constraints_idx = [c for c in self.constraints_idx]
     return copy_of_self
   
-  def recompute(self,*args):
-    if not args or '_distances_to_root' in args:
-      self._distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
-                                 for leaf in clade.leaf_names}
-    if not args or '_pairs_accounted_for' in args:
-      self._pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
-                                   for pair in itertools.combinations(clade.leaf_names,2)}
-    if not args or '_nested_set_reprs' in args:
-      self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
+  def recompute(self,*args,**kwargs):
+    if 'extension' in kwargs:
+      extension = kwargs['extension']
+      if type(extension).__name__ == 'LeafPairDistanceFrequency':
+        for leaf in extension.leaves:
+          self._distances_to_root[leaf] = 1
+        self._pairs_accounted_for.add(extension.leaves)
+        self._nested_set_reprs.append(frozenset({frozenset(extension.leaves),'r'}))
+      else:
+        self._distances_to_root = extension.distances_to_root
+        self._pairs_accounted_for = extension.pairs_accounted_for
+        self._nested_set_reprs = extension.nested_set_reprs
+    else:
+      if '_distances_to_root' in args:
+        self._distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
+                                   for leaf in clade.leaf_names}
+      if '_pairs_accounted_for' in args:
+        self._pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
+                                     for pair in itertools.combinations(clade.leaf_names,2)}
+      if '_nested_set_reprs' in args:
+        self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'}) for c in self.built_clades]
   
   def _property_getter(self,property):
     try:
