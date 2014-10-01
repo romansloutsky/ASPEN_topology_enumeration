@@ -1,12 +1,8 @@
 import math,itertools
 from sys import stderr
-from collections import defaultdict,namedtuple,Counter
+from collections import defaultdict,namedtuple
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tree import T
-
-#===============================================================================
-# Bugfixes on this branch
-#===============================================================================
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
@@ -75,7 +71,6 @@ class ProposedExtension(object):
   def build_extension(self,assemblyobj,in_place=False):
     if not in_place:
       assemblyobj = assemblyobj.copy()
-#       assemblyobj = copy.deepcopy(assemblyobj)
     assert not self.unverified
     
     # Assemble for removal from constraints_idx indeces of consistent and inconsistent pairdists
@@ -120,7 +115,8 @@ class TreeAssembly(object):
       self[key] = self.default_factory(key)
       return self[key]
   
-  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,absolute_freq_cutoff=0.01):
+  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
+               absolute_freq_cutoff=0.01):
     #===========================================================================
     # The data attributes below will are set on the class, not in instances,
     # meaning they will be shared between all instances of this class, saving
@@ -142,7 +138,8 @@ class TreeAssembly(object):
                     sum(d[1] for d in distances[:i]) < constraint_freq_cutoff]
           ) for leafpair,distances in pwleafdist_histograms]
                                             for score in pair_histogram[1]],
-                                           key=lambda x: (x.dist,1-x.freq) # sorted on (shortest dist, highest freq)
+                                           # sorted on (shortest dist, highest freq)
+                                           key=lambda x: (x.dist,1-x.freq)
                                                  )
                                           )
     
@@ -310,7 +307,7 @@ class TreeAssembly(object):
     return best_possible_final_score
   
   def filter_proposed_extensions(self,new_pairs,joins,attachments,
-                                 previously_seen,min_score=None):
+                                 encountered,min_score=None):
     joins = self.verify_remaining_proposed_pairs(joins)
     attachments = self.verify_remaining_proposed_pairs(attachments)
     
@@ -318,11 +315,11 @@ class TreeAssembly(object):
       for key,extension in extension_set.items():
         # First filter: has extension been encountered before?
         ext_nested_set_repr = self.as_nested_sets(extension)
-        if ext_nested_set_repr in previously_seen:
+        if ext_nested_set_repr in encountered:
           extension_set.pop(key)
           continue
         else:
-          previously_seen.add(ext_nested_set_repr)
+          encountered.add(ext_nested_set_repr)
         # Second filter: is score with extension already worse than min_score?
         if min_score is not None:
           try: # Will fail is item is a new pair - forgiveness faster than permission
@@ -342,7 +339,7 @@ class TreeAssembly(object):
     
     return new_pairs,joins,attachments
   
-  def find_extensions(self,previously_seen,min_score=None):
+  def find_extensions(self,encountered,min_score=None):
     new_pairs = {}
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
@@ -385,25 +382,24 @@ class TreeAssembly(object):
               new_leaf = leaf
           # And put the pair into the corresponding attachment's ProposedExtension object
           attachments[frozenset({clade_of_attached_leaf,new_leaf})].check_pair(pair,i)
-    return self.filter_proposed_extensions(new_pairs,joins,attachments,previously_seen,min_score)
+    return self.filter_proposed_extensions(new_pairs,joins,attachments,encountered,min_score)
     
   def build_extensions(self,new_pairs,joins,attachments):
     # Will need key of pair in new pairs, but not of keys in joins or attachments
     all_ext_to_build = new_pairs.items()+joins.values()+attachments.values()
-    updated_assemblies = []
+    extended_assemblies = []
     while all_ext_to_build:
       extension = all_ext_to_build.pop()
       try:
         if not all_ext_to_build:
-          updated_assemblies.append(extension.build_extension(self,in_place=True))
+          extended_assemblies.append(extension.build_extension(self,in_place=True))
         else:
-          updated_assemblies.append(extension.build_extension(self))
+          extended_assemblies.append(extension.build_extension(self))
       except AttributeError:
         if not all_ext_to_build:
           build_in = self
         else:
           build_in = self.copy()
-#           build_in = copy.deepcopy(self)
         idx_of_pair,pair = extension # Now we can get the key (index of pair in constraints_idx)
         
         # Select for dropping all pairs with distance 1 and one member of pair - they can't
@@ -426,8 +422,8 @@ class TreeAssembly(object):
         build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
         build_in.recompute(extension=pair)
         build_in.score += math.log(pair.freq)
-        updated_assemblies.append(build_in)
-    return updated_assemblies
+        extended_assemblies.append(build_in)
+    return extended_assemblies
   
   def generate_extensions(self,encountered_assemblies,min_score=None):
     new_pairs,joins,attachments = self.find_extensions(encountered_assemblies,min_score)
@@ -439,144 +435,3 @@ class TreeAssembly(object):
       # remove this assembly from the container of active assemblies
       return None
 
-def prepare_assemblies_for_iteration(accepted_assemblies,num_requested_trees,assemblies_workspace,
-                                     processing_bite_size,iternum):
-  # If we don't yet have a sufficient number of completed assemblies, then we can't filter proposed
-  # extensions on min_score, reducing the efficiency of our search. So we need to hurry up and
-  # complete at least as many assemblies as have been requested. If we are already working on more
-  # that requested number of assemblies, we'll sort them to bring the most likely to get finished
-  # first to the front and work this iteration only on as many as were requested to speed up iterations
-  # until we have accepted enough trees.
-  special_sort1 = lambda x: (len(x.free_leaves),sum((2*c.count_terminals()-1)/2
-                            for c in x.built_clades)/x.score)
-  special_sort2 = lambda x: sum((2*c.count_terminals()-1)/2 for c in x.built_clades)/x.score
-  if len(accepted_assemblies) < num_requested_trees and len(assemblies_workspace) > num_requested_trees:
-    # Sorting 1) by number of attached leaves, then 2) by avg score of pairwise distance of all pairs
-    # of attached leaves where both are attached under common root.
-    return sorted(assemblies_workspace,key=special_sort1)[:num_requested_trees]
-  # If sufficient number have been accepted:
-  elif len(accepted_assemblies) >= num_requested_trees:
-    # On every second iteration sort only on avg score of pw distances disregarding the number of remaining
-    # leaves, but take the full set of working assemblies or processing_bite_size many assemblies, whichever
-    # one is smaller.
-    if iternum % 2 == 0:
-      return sorted(assemblies_workspace,key=special_sort1)[:processing_bite_size]
-    else:
-      # On every sixth iteration sort in avg score order, disregarding the number of remaining leaves, and
-      # reverse to let the laggers at the end catch up, but only take half as many assemblies to work on.
-      if iternum % 3 == 0:
-        return sorted(assemblies_workspace,key=special_sort2,
-                      reverse=True)[:processing_bite_size/2]
-      # Remaining one third of iterations sort in avg score order and take processing_bite_size many assemblies.
-      else:
-        return sorted(assemblies_workspace,key=special_sort2)[:processing_bite_size]
-  else:
-    return [a for a in assemblies_workspace]
-
-def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_assemblies,
-                           encountered_assemblies,num_requested_trees,processing_bite_size,
-                           iternum):
-  added_this_iteration = 0
-  completed_this_iteration = 0
-  discarded_this_iteration = 0
-  
-  work_on_this_iteration = prepare_assemblies_for_iteration(accepted_assemblies, num_requested_trees,
-                                                            assemblies_workspace, processing_bite_size,
-                                                            iternum)
-  
-  print >>stderr,"On iteration",iternum+1," -",len(assemblies_workspace)+len(accepted_assemblies)+len(completed_assemblies),\
-                  "TOTAL total assemblies"
-  print >>stderr,len(assemblies_workspace)+len(accepted_assemblies),\
-                 "total assemblies,",len(accepted_assemblies)+len(completed_assemblies),"completed, working on",\
-                 len(work_on_this_iteration),"this iteration, total of",\
-                 len(assemblies_workspace),"are incomplete"
-  
-  assemblies_per_dot = int(math.ceil(float(len(work_on_this_iteration))/50))
-  drop_these_from_workspace = []
-  for i,assembly in enumerate(work_on_this_iteration):
-    print >>stderr,'['+'|'*(i % 10)+' '*(9-(i % 10))+']'+'['+'*'*(i/assemblies_per_dot)+' '*(50-i/assemblies_per_dot)+']'+\
-                        '\tcompleted:',completed_this_iteration,'discarded:',discarded_this_iteration,\
-                        'new:',added_this_iteration,'\r',
-    
-    if len(accepted_assemblies) >= num_requested_trees:
-      extended_assemblies = assembly.generate_extensions(encountered_assemblies,
-                                                         min_score=accepted_assemblies[-1].score)
-    else:
-      extended_assemblies = assembly.generate_extensions(encountered_assemblies)
-    if extended_assemblies is None:
-      discarded_this_iteration += 1
-      drop_these_from_workspace.append(i)
-      continue
-    else:
-      assert assembly is extended_assemblies[-1]
-    
-    drop_these = []
-    for j,ext_assembly in enumerate(extended_assemblies):
-      if ext_assembly.complete:
-        completed_this_iteration += 1
-        drop_these.append(j)
-        if ext_assembly is assembly:
-          drop_these_from_workspace.append(i)
-        accepted_assemblies.append(ext_assembly)
-        accepted_assemblies = sorted(accepted_assemblies,key=lambda x: x.score,reverse=True)
-        if len(accepted_assemblies) > num_requested_trees:
-          assert len(accepted_assemblies)-1 == num_requested_trees
-          completed_assemblies.append(accepted_assemblies.pop())
-      elif ext_assembly is not assembly:
-        assemblies_workspace.append(ext_assembly)
-        added_this_iteration += 1
-      else:
-        assert j == len(extended_assemblies)-1
-#     for j in drop_these[::-1]:
-#       extended_assemblies.pop(j)
-  
-  for i in drop_these_from_workspace[::-1]:
-    assemblies_workspace.pop(assemblies_workspace.index(work_on_this_iteration[i]))
-  
-  print >>stderr,' '*110+'\r',
-  if completed_this_iteration:
-    print >>stderr,'\t',completed_this_iteration,"were completed this iteration"
-  if added_this_iteration:
-    print >>stderr,'\t',added_this_iteration,"were added to the workspace this iteration"
-  if discarded_this_iteration:
-    print >>stderr,'\t',discarded_this_iteration,"were discarded from the workspace this iteration"
-  if accepted_assemblies:
-    print >>stderr,'\t'+"Best accepted score after this iteration is",accepted_assemblies[0].score
-    print >>stderr,'\t'+"Worst accepted score after this iteration is",accepted_assemblies[-1].score
-  print >>stderr,'\t',len(encountered_assemblies),"unique assemblies have been encountered"
-  
-  return accepted_assemblies
-    
-
-def assemble_trees(pwleafdist_histograms,leaves_to_assemble,num_requested_trees=1000,
-                   constraint_freq_cutoff=0.9,num_iter=10,processing_bite_size=10000,
-                   absolute_freq_cutoff=0.01):
-  # Init parent of all assemblies
-  assemblies_workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
-                                       leaves_to_assemble,absolute_freq_cutoff)]
-  accepted_assemblies = []
-  completed_assemblies = []
-  encountered_assemblies = set()
-  iterations = 0
-  enough_assemblies_accepted = False
-  while assemblies_workspace and iterations < num_iter:
-    updated_accepted_assemblies = assembly_iteration_new(assemblies_workspace,completed_assemblies,
-                                                         accepted_assemblies,encountered_assemblies,
-                                                         num_requested_trees,processing_bite_size,
-                                                         iterations)
-    if updated_accepted_assemblies is not accepted_assemblies:
-      accepted_assemblies = updated_accepted_assemblies
-    
-    # Did we reach the requested number of assemblies on this iteration?
-    if not enough_assemblies_accepted and len(accepted_assemblies) >= num_requested_trees:
-      # If yes, we should remove from the workspace assemblies that, unfinished, already have worse
-      # scores than the worst accepted assembly
-      prev_workspace_length = len(assemblies_workspace)
-      assemblies_workspace = filter(lambda x: x.score > accepted_assemblies[-1].score,
-                                    assemblies_workspace)
-      print >>stderr,"*** Reached",num_requested_trees,"accepted trees, dumping",\
-                      prev_workspace_length - len(assemblies_workspace),\
-                      "assemblies with scores worse than the worst accepted tree ***"
-      enough_assemblies_accepted = True
-    iterations += 1
-  return assemblies_workspace,accepted_assemblies
