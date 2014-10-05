@@ -1,4 +1,5 @@
 import math,itertools
+import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple
 from Bio.Phylo.BaseTree import Tree, Clade
@@ -436,18 +437,55 @@ class TreeAssembly(object):
       return None
 
 
+class FIFOfile(object):
+  def __init__(self,name='tmpworkspace',mode='b',wbuffering=0,rbuffering=0):
+    self.name = name
+    self._wh = open(self.name,'w'+mode,wbuffering)
+    self._rh = open(self.name,'r'+mode,rbuffering)
+  
+  def read(self):
+    try:
+      result = pickle.load(self._rh)
+    except EOFError:
+      try:
+        self._rh.readline()
+        result = pickle.load(self._rh)
+      except EOFError:
+        return None
+    return result
+  
+  def write(self,item):
+    pickle.dump(item,self._wh,pickle.HIGHEST_PROTOCOL)
+  
+  def close(self):
+    self._rh.close()
+    self._wh.close()
+  
+
 
 class AssemblyWorkspace(object):
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
-               absolute_freq_cutoff=0.01,num_requested_trees=1000):
-    self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
-                                   absolute_freq_cutoff)]
+               absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=10000,
+               tmpfilename='tmpworkspace'):
+    self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
+                                   leaves_to_assemble,absolute_freq_cutoff)]
     self.accepted_assemblies = []
     self.encountered_assemblies = set()
     
     self.iternum = 0
     
     self.num_requested_trees = num_requested_trees
+    self.max_workspace_size = max_workspace_size
+    
+    self.filename = tmpfilename
+  
+  @property
+  def _overflow(self):
+    try:
+      return self._overflowFIFO
+    except AttributeError:
+      self._overflowFIFO = FIFOfile(self.filename)
+      return self._overflowFIFO
   
   @property
   def min_score(self):
@@ -455,3 +493,23 @@ class AssemblyWorkspace(object):
       return self.accepted_assemblies[-1].score
     else:
       return None
+  
+  def update_workspace(self,new_assemblies=None):
+    while len(self.workspace) < self.max_workspace_size:
+      popped = self._overflow.read()
+      if popped is None:
+        break
+      else:
+        self.workspace.append(popped)
+    
+    if new_assemblies is not None:
+      if len(self.workspace) < self.max_workspace_size:
+        while len(self.workspace) < self.max_workspace_size:
+          try:
+            self.workspace.append(new_assemblies.pop(0))
+          except IndexError:
+            break
+      
+      if new_assemblies:
+        while new_assemblies:
+          self._overflow.write(new_assemblies.pop(0))
