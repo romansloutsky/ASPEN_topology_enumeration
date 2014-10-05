@@ -435,3 +435,23 @@ class TreeAssembly(object):
       # remove this assembly from the container of active assemblies
       return None
 
+
+
+class AssemblyWorkspace(object):
+  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
+               absolute_freq_cutoff=0.01,num_requested_trees=1000):
+    self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
+                                   absolute_freq_cutoff)]
+    self.accepted_assemblies = []
+    self.encountered_assemblies = set()
+    
+    self.iternum = 0
+    
+    self.num_requested_trees = num_requested_trees
+  
+  @property
+  def min_score(self):
+    if len(self.accepted_assemblies) >= self.num_requested_trees:
+      return self.accepted_assemblies[-1].score
+    else:
+      return None
