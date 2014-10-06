@@ -474,10 +474,8 @@ class AssemblyWorkspace(object):
     self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
                                    leaves_to_assemble,absolute_freq_cutoff)]
     self.accepted_assemblies = []
-    self.rejected_assemblies = []
     self.encountered_assemblies = set()
     
-    self.curr_min_score = None
     self.iternum = 0
     
     self.num_requested_trees = num_requested_trees
@@ -523,6 +521,22 @@ class AssemblyWorkspace(object):
         while new_assemblies:
           self._overflow.write(new_assemblies.pop(0))
   
+  def process_extended_assembly(self,assembly):
+    if assembly.complete:
+      if len(self.accepted_assemblies) < self.num_requested_trees\
+                                      or assembly.score > self.curr_min_score:
+        self.accepted_assemblies.append(assembly)
+        self.accepted_assemblies = sorted(self.accepted_assemblies,
+                                          key=lambda x: x.score,reverse=True)
+        while len(self.accepted_assemblies) > self.num_requested_trees:
+          self.rejected_assemblies.append(self.accepted_assemblies.pop())
+        self.curr_min_score = self.accepted_assemblies[-1].score
+      else:
+        self.rejected_assemblies.append(assembly)
+      return
+    else:
+      return assembly
+  
   def iterate(self):
     drop_from_workspace_idx = []
     for i,assembly in enumerate(self.workspace):
@@ -533,7 +547,9 @@ class AssemblyWorkspace(object):
         continue
       else:
         assert assembly is extended_assemblies[-1]
-        pass
+        if self.process_extended_assembly(extended_assemblies.pop()) is None:
+          drop_from_workspace_idx.append(i)
     for i in drop_from_workspace_idx[::-1]:
+      num_discarded_this_iteration += 1
       self.workspace.pop(i)
     self.iternum += 1
