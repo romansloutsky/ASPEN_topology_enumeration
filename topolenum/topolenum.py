@@ -1,4 +1,4 @@
-import math,itertools
+import math,itertools,tempfile
 import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple
@@ -438,9 +438,13 @@ class TreeAssembly(object):
 
 
 class FIFOfile(object):
-  def __init__(self,name='tmpworkspace',mode='b',wbuffering=0,rbuffering=0):
-    self.name = name
-    self._wh = open(self.name,'w'+mode,wbuffering)
+  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True):
+    if name == 'use_tempfile':
+      self._wh = tempfile.NamedTemporaryFile('w'+mode,bufsize=wbuffering,dir='.',delete=delete)
+      self.name = self._wh.name
+    else:
+      self.name = name
+      self._wh = open(self.name,'w'+mode,wbuffering)
     self._rh = open(self.name,'r'+mode,rbuffering)
   
   def read(self):
@@ -466,12 +470,14 @@ class FIFOfile(object):
 class AssemblyWorkspace(object):
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
                absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=10000,
-               tmpfilename='tmpworkspace'):
+               tmpfilename=None):
     self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
                                    leaves_to_assemble,absolute_freq_cutoff)]
     self.accepted_assemblies = []
+    self.rejected_assemblies = []
     self.encountered_assemblies = set()
     
+    self.curr_min_score = None
     self.iternum = 0
     
     self.num_requested_trees = num_requested_trees
@@ -484,7 +490,10 @@ class AssemblyWorkspace(object):
     try:
       return self._overflowFIFO
     except AttributeError:
-      self._overflowFIFO = FIFOfile(self.filename)
+      if self.filename is None:
+        self._overflowFIFO = FIFOfile('use_tempfile')
+      else:
+        self._overflowFIFO = FIFOfile(self.filename)
       return self._overflowFIFO
   
   @property
@@ -513,3 +522,18 @@ class AssemblyWorkspace(object):
       if new_assemblies:
         while new_assemblies:
           self._overflow.write(new_assemblies.pop(0))
+  
+  def iterate(self):
+    drop_from_workspace_idx = []
+    for i,assembly in enumerate(self.workspace):
+      extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
+                                                         self.curr_min_score)
+      if extended_assemblies is None:
+        drop_from_workspace_idx.append(i)
+        continue
+      else:
+        assert assembly is extended_assemblies[-1]
+        pass
+    for i in drop_from_workspace_idx[::-1]:
+      self.workspace.pop(i)
+    self.iternum += 1
