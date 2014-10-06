@@ -539,6 +539,7 @@ class AssemblyWorkspace(object):
   
   def iterate(self):
     drop_from_workspace_idx = []
+    new_incomplete_assemblies = []
     for i,assembly in enumerate(self.workspace):
       extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
                                                          self.curr_min_score)
@@ -549,7 +550,11 @@ class AssemblyWorkspace(object):
         assert assembly is extended_assemblies[-1]
         if self.process_extended_assembly(extended_assemblies.pop()) is None:
           drop_from_workspace_idx.append(i)
+      
+      new_incomplete_assemblies.extend([asbly for asbly in extended_assemblies
+                                        if self.process_extended_assembly(asbly) is not None])
     for i in drop_from_workspace_idx[::-1]:
       num_discarded_this_iteration += 1
       self.workspace.pop(i)
+    self.update_workspace(new_incomplete_assemblies)
     self.iternum += 1
