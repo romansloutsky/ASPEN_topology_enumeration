@@ -1,4 +1,5 @@
 import math,itertools
+import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple
 from Bio.Phylo.BaseTree import Tree, Clade
@@ -435,3 +436,28 @@ class TreeAssembly(object):
       # remove this assembly from the container of active assemblies
       return None
 
+
+class FIFOfile(object):
+  def __init__(self,name='tmpworkspace',mode='b',wbuffering=0,rbuffering=0):
+    self.name = name
+    self._wh = open(self.name,'w'+mode,wbuffering)
+    self._rh = open(self.name,'r'+mode,rbuffering)
+  
+  def read(self):
+    try:
+      result = pickle.load(self._rh)
+    except EOFError:
+      try:
+        self._rh.readline()
+        result = pickle.load(self._rh)
+      except EOFError:
+        return None
+    return result
+  
+  def write(self,item):
+    pickle.dump(item,self._wh,pickle.HIGHEST_PROTOCOL)
+  
+  def close(self):
+    self._rh.close()
+    self._wh.close()
+  
