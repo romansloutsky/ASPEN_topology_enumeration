@@ -542,7 +542,8 @@ class AssemblyWorkspace(object):
   
   def iterate(self):
     drop_from_workspace_idx = []
-    for i,assembly in enumerate(self.workspace):
+    workspace_this_iter = [assembly for assembly in self.workspace]
+    for i,assembly in enumerate(workspace_this_iter):
       extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
                                                          self.curr_min_score)
       if extended_assemblies is None:
