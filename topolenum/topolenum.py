@@ -1,4 +1,4 @@
-import math,itertools
+import math,itertools,tempfile
 import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple
@@ -438,9 +438,13 @@ class TreeAssembly(object):
 
 
 class FIFOfile(object):
-  def __init__(self,name='tmpworkspace',mode='b',wbuffering=0,rbuffering=0):
-    self.name = name
-    self._wh = open(self.name,'w'+mode,wbuffering)
+  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True):
+    if name == 'use_tempfile':
+      self._wh = tempfile.NamedTemporaryFile('w'+mode,bufsize=wbuffering,dir='.',delete=delete)
+      self.name = self._wh.name
+    else:
+      self.name = name
+      self._wh = open(self.name,'w'+mode,wbuffering)
     self._rh = open(self.name,'r'+mode,rbuffering)
   
   def read(self):
