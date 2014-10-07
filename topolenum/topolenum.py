@@ -474,8 +474,10 @@ class AssemblyWorkspace(object):
     self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
                                    leaves_to_assemble,absolute_freq_cutoff)]
     self.accepted_assemblies = []
+    self.rejected_assemblies = []
     self.encountered_assemblies = set()
     
+    self.curr_min_score = None
     self.iternum = 0
     
     self.num_requested_trees = num_requested_trees
@@ -507,7 +509,8 @@ class AssemblyWorkspace(object):
       if popped is None:
         break
       else:
-        self.workspace.append(popped)
+        if popped.score > self.curr_min_score:
+          self.workspace.append(popped)
     
     if new_assemblies is not None:
       if len(self.workspace) < self.max_workspace_size:
@@ -554,7 +557,6 @@ class AssemblyWorkspace(object):
       new_incomplete_assemblies.extend([asbly for asbly in extended_assemblies
                                         if self.process_extended_assembly(asbly) is not None])
     for i in drop_from_workspace_idx[::-1]:
-      num_discarded_this_iteration += 1
       self.workspace.pop(i)
     self.update_workspace(new_incomplete_assemblies)
     self.iternum += 1
