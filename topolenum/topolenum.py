@@ -477,10 +477,12 @@ class AssemblyWorkspace(object):
     self.rejected_assemblies = []
     self.encountered_assemblies = set()
     
+    self.num_requested_trees = num_requested_trees
+    self.reached_num_requested_trees = False
     self.curr_min_score = None
+    
     self.iternum = 0
     
-    self.num_requested_trees = num_requested_trees
     self.max_workspace_size = max_workspace_size
     
     self.filename = tmpfilename
@@ -495,13 +497,6 @@ class AssemblyWorkspace(object):
       else:
         self._overflowFIFO = FIFOfile(self.filename)
       return self._overflowFIFO
-  
-  @property
-  def min_score(self):
-    if len(self.accepted_assemblies) >= self.num_requested_trees:
-      return self.accepted_assemblies[-1].score
-    else:
-      return None
   
   def update_workspace(self,new_assemblies=None):
     while len(self.workspace) < self.max_workspace_size:
@@ -557,5 +552,8 @@ class AssemblyWorkspace(object):
                              if self.process_extended_assembly(asbly) is not None])
     for i in drop_from_workspace_idx[::-1]:
       self.workspace.pop(i)
+    if not self.reached_num_requested_trees:
+      if len(self.accepted_assemblies) == self.num_requested_trees:
+        self.workspace = [asbly for asbly in self.workspace if asbly.score > self.curr_min_score]
     self.update_workspace()
     self.iternum += 1
