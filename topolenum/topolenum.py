@@ -1,9 +1,22 @@
-import math,itertools,tempfile
+import math,itertools,tempfile,weakref
 import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple
 from Bio.Phylo.BaseTree import Tree, Clade
-from .tree import T
+from .tree import T as T_BASE
+
+
+class T(T_BASE):
+  
+  def __new__(cls,*args,**kwargs):
+    pass
+  
+  def _spawn(self,what_to_spawn,host=None,format=None):
+    pass
+  
+  def _get_spawned(self,item,host=None,format=None):
+    pass
+
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
