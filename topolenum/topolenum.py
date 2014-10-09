@@ -174,6 +174,11 @@ class TreeAssembly(object):
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
+  def __getstate__(self):
+    pass
+  
+  def __setstate__(self,state):
+    pass
   def copy(self):
     copy_of_self = type(self).__new__(type(self))
     copy_of_self._nested_set_reprs = [r for r in self._nested_set_reprs]
