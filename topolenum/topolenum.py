@@ -7,6 +7,16 @@ from .tree import T as T_BASE
 
 
 class T(T_BASE):
+  _to_wrapped_map = weakref.WeakValueDictionary()
+  
+  @classmethod
+  def _check_clade(cls,clade_obj):
+    try:
+      assert cls._to_wrapped_map[cls._nsrepr(clade_obj)] is clade_obj
+    except KeyError:
+      assert False,"Unknown non-leaf clade "+repr(cls._nsrepr(clade_obj))
+    except AssertionError:
+      assert False,"Duplicate clade "+repr(cls._nsrepr(clade_obj))
   
   def __new__(cls,*args,**kwargs):
     pass
@@ -16,6 +26,32 @@ class T(T_BASE):
   
   def _get_spawned(self,item,host=None,format=None):
     pass
+  @classmethod
+  def requisition(cls,clade_def1,clade_def2,*args):
+    new_clades_attr = []
+    for c in (clade_def1,clade_def2)+args:
+      if isinstance(c,str):
+        if c in cls._to_wrapped_map:
+          new_clades_attr.append(cls._to_wrapped_map[c])
+        else:
+          new_leaf = Clade(name=c)
+          cls._to_wrapped_map[c] = new_leaf
+          new_clades_attr.append(new_leaf)
+      else:
+        try:
+          cls._check_clade(c)
+        except AssertionError:
+          print "Caught clade error in requisition()"
+          raise
+        new_clades_attr.append(c)
+    proposed_key = frozenset(cls._nsrepr(c) for c in new_clades_attr)
+    if proposed_key in cls._to_wrapped_map:
+      return cls(cls._to_wrapped_map[proposed_key])
+    else:
+      nonleaf_clade = Clade(clades=new_clades_attr)
+      cls._to_wrapped_map[cls._nsrepr(nonleaf_clade)] = nonleaf_clade
+      return cls(nonleaf_clade)
+  
 
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
@@ -96,7 +132,7 @@ class ProposedExtension(object):
       built_clade = assemblyobj.built_clades.pop(self.built_clade.index)
       assemblyobj.free_leaves.remove(self.new_leaf)
       assert set(self.built_clade.clade.leaf_names) == set(built_clade.leaf_names)
-      new_clades_attr = [built_clade.wrapped,Clade(name=self.new_leaf)]
+      new_clades_attr = [built_clade.wrapped,self.new_leaf]
       # One more thing to do if this extension is an attachment of a new leaf:
       # Add for removal constraint pairdists where the new leaf has distance 1 with any
       # other leaf, regardless of whether the other leaf is involved in this extension.
@@ -114,7 +150,7 @@ class ProposedExtension(object):
     assemblyobj.constraints_idx = filter(lambda x: x not in drop_these,
                                          assemblyobj.constraints_idx)
     
-    assemblyobj.built_clades.append(T(Clade(clades=new_clades_attr)))
+    assemblyobj.built_clades.append(T.requisition(*new_clades_attr))
     assemblyobj.recompute(extension=self)
     assemblyobj.score += self.score
     return assemblyobj
@@ -438,7 +474,7 @@ class TreeAssembly(object):
           build_in.free_leaves.remove(leaf) # Pop each leaf in pair from free_leaves
         
         # Build new clade and update the score
-        build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
+        build_in.built_clades.append(T.requisition(*tuple(pair.leaves)))
         build_in.recompute(extension=pair)
         build_in.score += math.log(pair.freq)
         extended_assemblies.append(build_in)
