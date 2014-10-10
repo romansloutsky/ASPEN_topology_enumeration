@@ -59,14 +59,11 @@ class T(T_BASE):
       self._spawned = {}
     id_item = id(item)
     if id_item not in self._spawned:
-      if id_item in type(self)._to_wrappers_map:
-        self._spawned[id_item] = type(self)._to_wrappers_map[id_item]
-      else:
-        if not host:
-          host = self._hostObj
-        if not format:
-          format = self._format
-        self._spawned[id_item] = type(self)(item,host,format)
+      if not host:
+        host = self._hostObj
+      if not format:
+        format = self._format
+      self._spawned[id_item] = type(self)(item,host,format)
     return self._spawned[id_item]
   
   @classmethod
