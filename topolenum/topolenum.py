@@ -10,6 +10,18 @@ class T(T_BASE):
   _to_wrapped_map = weakref.WeakValueDictionary()
   
   @classmethod
+  def _nsrepr(cls,obj):
+    if obj.is_terminal():
+      return obj.name
+    elif all(c.is_terminal() for c in obj.clades):
+      return frozenset(c.name for c in obj.clades)
+    elif any(c.is_terminal() for c in obj.clades):
+      return frozenset(c.name if c.is_terminal() else
+                       cls._nsrepr(c) for c in obj.clades)
+    else:
+      return frozenset(cls._nsrepr(c) for c in obj.clades)
+  
+  @classmethod
   def _check_clade(cls,clade_obj):
     try:
       assert cls._to_wrapped_map[cls._nsrepr(clade_obj)] is clade_obj
