@@ -1,7 +1,7 @@
 import math,itertools,tempfile,weakref
 import cPickle as pickle
 from sys import stderr
-from collections import defaultdict,namedtuple
+from collections import defaultdict,namedtuple,Counter
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tree import T as T_BASE
 
@@ -9,6 +9,9 @@ from .tree import T as T_BASE
 class T(T_BASE):
   _to_wrappers_map = weakref.WeakValueDictionary()
   _to_wrapped_map = weakref.WeakValueDictionary()
+  
+  _keep_alive = {}
+  _pickle_counts = Counter()
   
   @classmethod
   def _nsrepr(cls,obj):
@@ -92,6 +95,25 @@ class T(T_BASE):
       cls._to_wrapped_map[cls._nsrepr(nonleaf_clade)] = nonleaf_clade
       return cls(nonleaf_clade)
   
+  def increment_pickle_count(self):
+    key = self._nsrepr(self._wrapped_obj)
+    if key not in self._keep_alive:
+      assert self._pickle_counts[key] == 0
+      self._keep_alive[key] = self._wrapped_obj
+    self._pickle_counts[key] += 1
+    return key
+  
+  @classmethod
+  def decrement_pickle_count(cls,key):
+    assert key in cls._pickle_counts and cls._pickle_counts[key] > 0
+    assert key in cls._keep_alive
+    cls._pickle_counts[key] -= 1
+    if cls._pickle_counts[key] == 0:
+      kept_alive = cls._keep_alive.pop(key)
+      cls._pickle_counts.pop(key)
+    else:
+      kept_alive = cls._to_wrapped_map[key]
+    return cls(kept_alive)
 
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
@@ -251,10 +273,17 @@ class TreeAssembly(object):
     self.score = 0.0
   
   def __getstate__(self):
-    pass
+    state = {k:v for k,v in self.__dict__.items() if k != 'built_clades'}
+    state['built_clades'] = [c.increment_pickle_count() for c in self.built_clades]
+    return state
   
   def __setstate__(self,state):
-    pass
+    for k,v in state.items():
+      if k != 'built_clades':
+        self.__dict__[k] = v
+    self.__dict__['built_clades'] = [T.decrement_pickle_count(k)
+                                     for k in state['built_clades']]
+  
   def copy(self):
     copy_of_self = type(self).__new__(type(self))
     copy_of_self._nested_set_reprs = [r for r in self._nested_set_reprs]
