@@ -7,6 +7,7 @@ from .tree import T as T_BASE
 
 
 class T(T_BASE):
+  _to_wrappers_map = weakref.WeakValueDictionary()
   _to_wrapped_map = weakref.WeakValueDictionary()
   
   @classmethod
@@ -31,7 +32,27 @@ class T(T_BASE):
       assert False,"Duplicate clade "+repr(cls._nsrepr(clade_obj))
   
   def __new__(cls,*args,**kwargs):
-    pass
+    if 'source' in kwargs:
+      obj = kwargs['source']
+    elif args:
+      obj = args[0]
+    else:
+      return T_BASE.__new__(cls,*args,**kwargs)
+    if hasattr(obj,'is_terminal'):
+      try:
+        cls._check_clade(obj)
+      except AssertionError:
+        print "Caught clade error in __new__"
+        raise
+      obj_to_wrapper_key = id(obj)
+      if obj_to_wrapper_key in cls._to_wrappers_map:
+        return cls._to_wrappers_map[obj_to_wrapper_key]
+      else:
+        new_obj = T_BASE.__new__(cls,*args,**kwargs)
+        cls._to_wrappers_map[obj_to_wrapper_key] = new_obj
+        return new_obj
+    else:
+      return T_BASE.__new__(cls,*args,**kwargs)
   
   def _spawn(self,what_to_spawn,host=None,format=None):
     pass
