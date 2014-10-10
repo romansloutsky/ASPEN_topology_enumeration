@@ -54,11 +54,21 @@ class T(T_BASE):
     else:
       return T_BASE.__new__(cls,*args,**kwargs)
   
-  def _spawn(self,what_to_spawn,host=None,format=None):
-    pass
-  
   def _get_spawned(self,item,host=None,format=None):
-    pass
+    if not hasattr(self,'_spawned') or self._spawned is None:
+      self._spawned = {}
+    id_item = id(item)
+    if id_item not in self._spawned:
+      if id_item in type(self)._to_wrappers_map:
+        self._spawned[id_item] = type(self)._to_wrappers_map[id_item]
+      else:
+        if not host:
+          host = self._hostObj
+        if not format:
+          format = self._format
+        self._spawned[id_item] = type(self)(item,host,format)
+    return self._spawned[id_item]
+  
   @classmethod
   def requisition(cls,clade_def1,clade_def2,*args):
     new_clades_attr = []
