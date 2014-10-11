@@ -578,6 +578,7 @@ class FIFOfile(object):
         self._rh.readline()
         result = pickle.load(self._rh)
       except EOFError:
+        self._rh.seek(self._rh.tell()) #Without this under Ubuntu get a pickling error
         return None
     return result
   
