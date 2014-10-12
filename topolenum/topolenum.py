@@ -92,6 +92,23 @@ class T(T_BASE):
       cls._to_wrapped_map[cls._nsrepr(nonleaf_clade)] = nonleaf_clade
       return cls(nonleaf_clade)
   
+  @classmethod
+  def rebuild_on_unpickle(cls,clade_repr,top_level_call=True):
+    if clade_repr in cls._to_wrapped_map:
+      if top_level_call:
+        return cls(cls._to_wrapped_map[clade_repr])
+      else:
+        return cls._to_wrapped_map[clade_repr]
+    elif isinstance(clade_repr,str):
+      leaf = Clade(name=clade_repr)
+      cls._to_wrapped_map[clade_repr] = leaf
+      return leaf
+    if top_level_call:
+      return cls.requisition(*[cls.rebuild_on_unpickle(c_repr,False)
+                               for c_repr in clade_repr])
+    else:
+      return cls.requisition(*[cls.rebuild_on_unpickle(c_repr,False)
+                               for c_repr in clade_repr]).wrapped
 
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
