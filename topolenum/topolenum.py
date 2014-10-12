@@ -268,10 +268,17 @@ class TreeAssembly(object):
     self.score = 0.0
   
   def __getstate__(self):
-    pass
+    state = {k:v for k,v in self.__dict__.items() if k != 'built_clades'}
+    state['built_clades'] = [T._nsrepr(c) for c in self.built_clades]
+    return state
   
   def __setstate__(self,state):
-    pass
+    for k,v in state.items():
+      if k != 'built_clades':
+        self.__dict__[k] = v
+    self.__dict__['built_clades'] = [T.rebuild_on_unpickle(clade_repr)
+                                     for clade_repr in state['built_clades']]
+  
   def copy(self):
     copy_of_self = type(self).__new__(type(self))
     copy_of_self._nested_set_reprs = [r for r in self._nested_set_reprs]
