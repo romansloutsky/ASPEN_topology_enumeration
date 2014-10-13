@@ -616,7 +616,47 @@ class FIFOfile(object):
   def close(self):
     self._rh.close()
     self._wh.close()
+
+
+class CladeReprTracker(object):
+  def __init__(self,leaves):
+    self.encountered = set()
+    self.leaves = {leaf:i+1 for i,leaf in enumerate(sorted(leaves))}
+
+  def __len__(self):
+    return len(self.encountered)
   
+  def _recursively_build_repr(self,c):
+    nonleaflist = sorted((self._recursively_build_repr(m) for m in c if not
+                          isinstance(m,str)),key=lambda x: x[1])
+    nonleaves = ','.join(v[0] for v in nonleaflist)
+    leafnumbers = sorted(self.leaves[m] for m in c if isinstance(m,str))
+    leaves = ','.join(str(leaf) for leaf in leafnumbers)
+    returnstr = '['
+    take_my_min = []
+    if nonleaves:
+        returnstr += nonleaves
+        take_my_min.append(nonleaflist[0][1])
+        if leaves:
+            returnstr += ','
+    if leaves:
+        returnstr += leaves
+        take_my_min.append(leafnumbers[0])
+    returnstr += ']'
+    return returnstr,min(take_my_min)
+
+  def make_str_repr(self,cladeset):
+    cladestrlist = sorted((self._recursively_build_repr(m) for c in cladeset for m in c
+                           if m !='r'),key=lambda x: x[1])
+    return '{'+','.join(v[0] for v in cladestrlist)+'}'
+  
+  def already_encountered(self,cladeset):
+    csrepr = self.make_str_repr(cladeset)
+    if csrepr in self.encountered:
+      return True
+    else:
+      self.encountered.add(csrepr)
+      return False
 
 
 class AssemblyWorkspace(object):
