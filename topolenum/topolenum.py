@@ -416,9 +416,10 @@ class TreeAssembly(object):
                                     if i not in indeces_to_skip]
       extension.nested_set_reprs.append(new_clade)
     
-    old_clades = frozenset(c for i,c in enumerate(self.current_clades_as_nested_sets)
-                           if i not in indeces_to_skip)
-    return old_clades|frozenset({new_clade})
+    clades = [c for i,c in enumerate(self.current_clades_as_nested_sets)
+                           if i not in indeces_to_skip]
+    clades.append(new_clade)
+    return clades
   
   def best_case_with_extension(self,extension):
     try:
@@ -466,12 +467,9 @@ class TreeAssembly(object):
     for extension_set in (new_pairs,joins,attachments):
       for key,extension in extension_set.items():
         # First filter: has extension been encountered before?
-        ext_nested_set_repr = self.as_nested_sets(extension)
-        if ext_nested_set_repr in encountered:
+        if encountered.already_encountered(self.as_nested_sets(extension)):
           extension_set.pop(key)
           continue
-        else:
-          encountered.add(ext_nested_set_repr)
         # Second filter: is score with extension already worse than min_score?
         if min_score is not None:
           try: # Will fail is item is a new pair - forgiveness faster than permission
@@ -580,11 +578,8 @@ class TreeAssembly(object):
   def generate_extensions(self,encountered_assemblies,min_score=None):
     new_pairs,joins,attachments = self.find_extensions(encountered_assemblies,min_score)
     if any((new_pairs,joins,attachments)):
-      # Return built extensions and any additional information
       return self.build_extensions(new_pairs, joins, attachments)
     else:
-      # Somehow inform caller that this assembly is unextendable - it is the caller's responsibility to
-      # remove this assembly from the container of active assemblies
       return None
 
 
@@ -668,7 +663,7 @@ class AssemblyWorkspace(object):
                                    keep_alive_when_pickling=keep_alive_when_pickling)]
     self.accepted_assemblies = []
     self.rejected_assemblies = []
-    self.encountered_assemblies = set()
+    self.encountered_assemblies = CladeReprTracker(leaves_to_assemble)
     
     self.num_requested_trees = num_requested_trees
     self.reached_num_requested_trees = False
