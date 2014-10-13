@@ -95,7 +95,25 @@ class T(T_BASE):
       cls._to_wrapped_map[cls._nsrepr(nonleaf_clade)] = nonleaf_clade
       return cls(nonleaf_clade)
   
-  def increment_pickle_count(self):
+  @classmethod
+  def rebuild_on_unpickle(cls,clade_repr,top_level_call=True):
+    if clade_repr in cls._to_wrapped_map:
+      if top_level_call:
+        return cls(cls._to_wrapped_map[clade_repr])
+      else:
+        return cls._to_wrapped_map[clade_repr]
+    elif isinstance(clade_repr,str):
+      leaf = Clade(name=clade_repr)
+      cls._to_wrapped_map[clade_repr] = leaf
+      return leaf
+    if top_level_call:
+      return cls.requisition(*[cls.rebuild_on_unpickle(c_repr,False)
+                               for c_repr in clade_repr])
+    else:
+      return cls.requisition(*[cls.rebuild_on_unpickle(c_repr,False)
+                               for c_repr in clade_repr]).wrapped
+  
+  def check_in_pickle(self):
     key = self._nsrepr(self._wrapped_obj)
     if key not in self._keep_alive:
       assert self._pickle_counts[key] == 0
@@ -104,7 +122,7 @@ class T(T_BASE):
     return key
   
   @classmethod
-  def decrement_pickle_count(cls,key):
+  def check_out_pickle(cls,key):
     assert key in cls._pickle_counts and cls._pickle_counts[key] > 0
     assert key in cls._keep_alive
     cls._pickle_counts[key] -= 1
@@ -228,7 +246,7 @@ class TreeAssembly(object):
       return self[key]
   
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
-               absolute_freq_cutoff=0.01):
+               absolute_freq_cutoff=0.01,keep_alive_when_pickling=True):
     #===========================================================================
     # The data attributes below will are set on the class, not in instances,
     # meaning they will be shared between all instances of this class, saving
@@ -271,18 +289,27 @@ class TreeAssembly(object):
     self.free_leaves = set(leaves_to_assemble)
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
+    
+    self.keep_alive = keep_alive_when_pickling
   
   def __getstate__(self):
     state = {k:v for k,v in self.__dict__.items() if k != 'built_clades'}
-    state['built_clades'] = [c.increment_pickle_count() for c in self.built_clades]
+    if self.keep_alive:
+      state['built_clades'] = [c.check_in_pickle() for c in self.built_clades]
+    else:
+      state['built_clades'] = [T._nsrepr(c) for c in self.built_clades]
     return state
   
   def __setstate__(self,state):
     for k,v in state.items():
       if k != 'built_clades':
         self.__dict__[k] = v
-    self.__dict__['built_clades'] = [T.decrement_pickle_count(k)
-                                     for k in state['built_clades']]
+    if self.keep_alive:
+      self.__dict__['built_clades'] = [T.check_out_pickle(k)
+                                       for k in state['built_clades']]
+    else:
+      self.__dict__['built_clades'] = [T.rebuild_on_unpickle(clade_repr)
+                                       for clade_repr in state['built_clades']]
   
   def copy(self):
     copy_of_self = type(self).__new__(type(self))
@@ -293,6 +320,7 @@ class TreeAssembly(object):
     copy_of_self._pairs_accounted_for = {p for p in self._pairs_accounted_for}
     copy_of_self.built_clades = [bc for bc in self.built_clades]
     copy_of_self.constraints_idx = [c for c in self.constraints_idx]
+    copy_of_self.keep_alive = self.keep_alive
     return copy_of_self
   
   def recompute(self,*args,**kwargs):
@@ -594,9 +622,10 @@ class FIFOfile(object):
 class AssemblyWorkspace(object):
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
                absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=10000,
-               tmpfilename=None):
+               tmpfilename=None,keep_alive_when_pickling=True):
     self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
-                                   leaves_to_assemble,absolute_freq_cutoff)]
+                                   leaves_to_assemble,absolute_freq_cutoff,
+                                   keep_alive_when_pickling=keep_alive_when_pickling)]
     self.accepted_assemblies = []
     self.rejected_assemblies = []
     self.encountered_assemblies = set()
