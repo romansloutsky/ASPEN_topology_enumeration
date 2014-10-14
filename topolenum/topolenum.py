@@ -1,4 +1,8 @@
-import math,itertools,tempfile,weakref
+import math
+import itertools
+import tempfile
+import weakref
+import multiprocessing
 import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple,Counter
@@ -745,3 +749,26 @@ class AssemblyWorkspace(object):
         self.workspace = [asbly for asbly in self.workspace if asbly.score > self.curr_min_score]
     self.update_workspace()
     self.iternum += 1
+
+
+class SharedFIFOfile(FIFOfile):
+  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True):
+    FIFOfile.__init__(self,name,mode,wbuffering,rbuffering,delete)
+    self.lock = multiprocessing.Lock()
+    self.acquire = self.lock.acquire
+    self.release = self.lock.release
+  
+  def _sync_safe_access(self,method,args,be_polite):
+    if be_polite:
+      self.acquire()
+    result = method(self,*args)
+    if be_polite:
+      self.release()
+    return result
+  
+  def read(self,be_polite=True):
+    return self._sync_safe_access(FIFOfile.read,tuple(),be_polite)
+  
+  def write(self,item,be_polite=True):
+    return self._sync_safe_access(FIFOfile.write,(item,),be_polite)
+
