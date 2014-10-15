@@ -783,4 +783,9 @@ class SharedFIFOfile(FIFOfile):
     if not already_have_lock:
       self.set()
   
+  def push_all(self,items):
+    with self.lock:
+      for item in items:
+        self.push(item,already_have_lock=True)
+    self.set()
 
