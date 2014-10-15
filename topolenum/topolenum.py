@@ -597,7 +597,7 @@ class FIFOfile(object):
       self._wh = open(self.name,'w'+mode,wbuffering)
     self._rh = open(self.name,'r'+mode,rbuffering)
   
-  def read(self):
+  def pop(self):
     try:
       result = pickle.load(self._rh)
     except EOFError:
@@ -609,7 +609,7 @@ class FIFOfile(object):
         return None
     return result
   
-  def write(self,item):
+  def push(self,item):
     pickle.dump(item,self._wh,pickle.HIGHEST_PROTOCOL)
   
   def close(self):
@@ -692,7 +692,7 @@ class AssemblyWorkspace(object):
   
   def update_workspace(self,new_assemblies=None):
     while len(self.workspace) < self.max_workspace_size:
-      popped = self._overflow.read()
+      popped = self._overflow.pop()
       if popped is None:
         break
       else:
@@ -709,7 +709,7 @@ class AssemblyWorkspace(object):
       
       if new_assemblies:
         while new_assemblies:
-          self._overflow.write(new_assemblies.pop(0))
+          self._overflow.push(new_assemblies.pop(0))
   
   def process_extended_assembly(self,assembly):
     if assembly.complete:
