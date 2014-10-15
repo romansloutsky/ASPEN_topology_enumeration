@@ -588,14 +588,15 @@ class TreeAssembly(object):
 
 
 class FIFOfile(object):
-  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True):
+  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True,open_rh=True):
     if name == 'use_tempfile':
       self._wh = tempfile.NamedTemporaryFile('w'+mode,bufsize=wbuffering,dir='.',delete=delete)
       self.name = self._wh.name
     else:
       self.name = name
       self._wh = open(self.name,'w'+mode,wbuffering)
-    self._rh = open(self.name,'r'+mode,rbuffering)
+    if open_rh:
+      self._rh = open(self.name,'r'+mode,rbuffering)
   
   def pop(self):
     try:
@@ -753,7 +754,8 @@ class AssemblyWorkspace(object):
 
 class SharedFIFOfile(FIFOfile):
   def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True):
-    FIFOfile.__init__(self,name,mode,wbuffering,rbuffering,delete)
+    self.init_args = (name,mode,wbuffering,rbuffering,delete,False)
+    
     self.lock = multiprocessing.Lock()
     self.acquire = self.lock.acquire
     self.release = self.lock.release
@@ -763,6 +765,9 @@ class SharedFIFOfile(FIFOfile):
     self.is_set = self.event.is_set
     self.clear = self.event.clear
     self.wait = self.event.wait
+  
+  def start_IN_end(self):
+    FIFOfile.__init__(self,*self.init_args)
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:
