@@ -757,6 +757,12 @@ class SharedFIFOfile(FIFOfile):
     self.lock = multiprocessing.Lock()
     self.acquire = self.lock.acquire
     self.release = self.lock.release
+    
+    self.event = multiprocessing.Event()
+    self.set = self.event.set
+    self.is_set = self.event.is_set
+    self.clear = self.event.clear
+    self.wait = self.event.wait
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:
@@ -766,10 +772,15 @@ class SharedFIFOfile(FIFOfile):
       return method(self,*args)
   
   def pop(self):
+    self.wait()
     result = self._sync_safe_method_call(FIFOfile.pop,tuple())
+    if result is None:
+      self.clear()
     return result
   
   def push(self,item,already_have_lock=False):
     self._sync_safe_method_call(FIFOfile.push,(item,),already_have_lock)
+    if not already_have_lock:
+      self.set()
   
 
