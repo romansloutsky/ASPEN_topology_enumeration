@@ -811,3 +811,15 @@ class SharedFIFOfile(FIFOfile):
   def close(self):
     self._sync_safe_method_call(FIFOfile.close,tuple())
 
+
+def load_queue(fifo,queue):#,min_score_defined_Event,min_score):
+  fifo.start_OUT_end()
+  while True:
+    popped = fifo.pop()
+    if popped is None:
+      continue
+    elif popped == 'SHUTDOWN':
+      break
+    else:
+      queue.put(popped)
+  return
