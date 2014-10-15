@@ -788,4 +788,7 @@ class SharedFIFOfile(FIFOfile):
       for item in items:
         self.push(item,already_have_lock=True)
     self.set()
+  
+  def close(self):
+    self._sync_safe_method_call(FIFOfile.close,tuple())
 
