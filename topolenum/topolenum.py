@@ -758,17 +758,18 @@ class SharedFIFOfile(FIFOfile):
     self.acquire = self.lock.acquire
     self.release = self.lock.release
   
-  def _sync_safe_access(self,method,args,be_polite):
-    if be_polite:
-      self.acquire()
-    result = method(self,*args)
-    if be_polite:
-      self.release()
+  def _sync_safe_method_call(self,method,args,already_have_lock=False):
+    if not already_have_lock:
+      with self.lock:
+        return method(self,*args)
+    else:
+      return method(self,*args)
+  
+  def pop(self):
+    result = self._sync_safe_method_call(FIFOfile.pop,tuple())
     return result
   
-  def read(self,be_polite=True):
-    return self._sync_safe_access(FIFOfile.read,tuple(),be_polite)
+  def push(self,item,already_have_lock=False):
+    self._sync_safe_method_call(FIFOfile.push,(item,),already_have_lock)
   
-  def write(self,item,be_polite=True):
-    return self._sync_safe_access(FIFOfile.write,(item,),be_polite)
 
