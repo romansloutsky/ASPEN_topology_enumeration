@@ -614,8 +614,10 @@ class FIFOfile(object):
     pickle.dump(item,self._wh,pickle.HIGHEST_PROTOCOL)
   
   def close(self):
-    self._rh.close()
-    self._wh.close()
+    if hasattr(self,'_rh'):
+      self._rh.close()
+    if hasattr(self,'_wh'):
+      self._wh.close()
 
 
 class CladeReprTracker(object):
