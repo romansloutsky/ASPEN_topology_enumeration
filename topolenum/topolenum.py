@@ -775,6 +775,14 @@ class SharedFIFOfile(FIFOfile):
       self.send_filename.send(self.name)
       self.send_filename.close()
   
+  def start_OUT_end(self):
+    if self.init_args[0] == 'use_tempfile':
+      self.name = self.get_filename.recv()
+      self.get_filename.close()
+    mode = self.init_args[1]
+    rbuffering = self.init_args[3]
+    self._rh = open(self.name,'r'+mode,rbuffering)
+  
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:
       with self.lock:
