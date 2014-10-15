@@ -765,9 +765,15 @@ class SharedFIFOfile(FIFOfile):
     self.is_set = self.event.is_set
     self.clear = self.event.clear
     self.wait = self.event.wait
+    
+    if name == 'use_tempfile':
+      self.get_filename,self.send_filename = multiprocessing.Pipe(duplex=False)
   
   def start_IN_end(self):
     FIFOfile.__init__(self,*self.init_args)
+    if self.init_args[0] == 'use_tempfile':
+      self.send_filename.send(self.name)
+      self.send_filename.close()
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:
