@@ -3,6 +3,8 @@ import itertools
 import tempfile
 import weakref
 import multiprocessing
+import Queue
+import gc
 import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple,Counter
@@ -814,14 +816,30 @@ class SharedFIFOfile(FIFOfile):
     self._sync_safe_method_call(FIFOfile.close,tuple())
 
 
-def load_queue(fifo,queue):#,min_score_defined_Event,min_score):
-  fifo.start_OUT_end()
-  while True:
-    popped = fifo.pop()
-    if popped is None:
-      continue
-    elif popped == 'SHUTDOWN':
-      break
-    else:
-      queue.put(popped)
-  return
+class QueueLoader(multiprocessing.Process):
+  def __init__(self,fifo,queue):
+    multiprocessing.Process.__init__(self)
+    self.fifo = fifo
+    self.queue = queue
+    self.daemon = True
+  
+  def run(self):
+    multiprocessing.Process.run(self)
+    self.fifo.start_OUT_end()
+    while True:
+      popped = self.fifo.pop()
+      if popped is None:
+        continue
+      elif popped == 'SHUTDOWN':
+        break
+      else:
+        while True:
+          try:
+            self.queue.put(popped,timeout=5)
+            break
+          except Queue.Full:
+            continue
+    self.fifo.close()
+    return
+
+
