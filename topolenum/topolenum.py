@@ -816,6 +816,17 @@ class SharedFIFOfile(FIFOfile):
     self._sync_safe_method_call(FIFOfile.close,tuple())
 
 
+class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
+  def __init__(self,fifo,queue,
+               pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
+               absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=1000):
+    AssemblyWorkspace.__init__(self,pwleafdist_histograms,constraint_freq_cutoff,
+                               leaves_to_assemble,absolute_freq_cutoff,
+                               num_requested_trees,max_workspace_size,
+                               keep_alive_when_pickling=False)
+    
+    self.fifo = fifo
+    self.queue = queue
 class QueueLoader(multiprocessing.Process):
   def __init__(self,fifo,queue):
     multiprocessing.Process.__init__(self)
