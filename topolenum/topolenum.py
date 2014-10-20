@@ -817,6 +817,9 @@ class SharedFIFOfile(FIFOfile):
 
 
 class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
+  class AssemblyWorkFinished(Exception):
+    pass
+  
   def __init__(self,fifo,queue,
                pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
                absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=1000):
@@ -828,6 +831,20 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self.fifo = fifo
     self.queue = queue
 
+  def top_off_workspace(self):
+    while len(self.workspace) < self.max_workspace_size:
+      try:
+        pickled_assembly = self.queue.get_nowait()
+      except Queue.Empty:
+        if self.fifo.is_set():
+          pickled_assembly = self.queue.get(timeout=5)
+        else:
+          if not self.workspace:
+            raise self.AssemblyWorkFinished
+          else:
+            break
+      self.workspace.append(pickle.loads(pickled_assembly))
+  
   def push_to_fifo(self,push_these):
     self.fifo.push_all(push_these)
 
