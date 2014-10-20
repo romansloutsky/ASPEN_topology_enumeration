@@ -848,6 +848,12 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def push_to_fifo(self,push_these):
     self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
                        for item in push_these)
+  
+  def iterate(self):
+    try:
+      AssemblyWorkspace.iterate(self)
+    except self.AssemblyWorkFinished:
+      return 'FINISHED'
 
 
 class QueueLoader(multiprocessing.Process):
