@@ -666,7 +666,7 @@ class CladeReprTracker(object):
 class AssemblyWorkspace(object):
   def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
                absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=10000,
-               tmpfilename=None,keep_alive_when_pickling=True):
+               fifo=None,keep_alive_when_pickling=True):
     self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
                                    leaves_to_assemble,absolute_freq_cutoff,
                                    keep_alive_when_pickling=keep_alive_when_pickling)]
@@ -682,28 +682,30 @@ class AssemblyWorkspace(object):
     
     self.max_workspace_size = max_workspace_size
     
-    self.filename = tmpfilename
+    self.fifo = fifo
   
-  @property
-  def _overflow(self):
-    try:
-      return self._overflowFIFO
-    except AttributeError:
-      if self.filename is None:
-        self._overflowFIFO = FIFOfile('use_tempfile')
-      else:
-        self._overflowFIFO = FIFOfile(self.filename)
-      return self._overflowFIFO
+  def top_off_workspace(self):
+    if self.fifo is None or isinstance(self.fifo,str):
+      return
+    else:
+      while len(self.workspace) < self.max_workspace_size:
+        popped = self.fifo.pop()
+        if popped is None:
+          break
+        else:
+          if popped.score > self.curr_min_score:
+            self.workspace.append(popped)
+  
+  def push_to_fifo(self,push_these):
+    if self.fifo is None:
+      self.fifo = FIFOfile()
+    elif isinstance(self.fifo,str):
+      self.fifo = FIFOfile(name=self.fifo)
+    for item in push_these:
+      self.fifo.push(item)
   
   def update_workspace(self,new_assemblies=None):
-    while len(self.workspace) < self.max_workspace_size:
-      popped = self._overflow.pop()
-      if popped is None:
-        break
-      else:
-        if popped.score > self.curr_min_score:
-          self.workspace.append(popped)
-    
+    self.top_off_workspace()
     if new_assemblies is not None:
       if len(self.workspace) < self.max_workspace_size:
         while len(self.workspace) < self.max_workspace_size:
@@ -711,10 +713,8 @@ class AssemblyWorkspace(object):
             self.workspace.append(new_assemblies.pop(0))
           except IndexError:
             break
-      
       if new_assemblies:
-        while new_assemblies:
-          self._overflow.push(new_assemblies.pop(0))
+        self.push_to_fifo(new_assemblies)
   
   def process_extended_assembly(self,assembly):
     if assembly.complete:
