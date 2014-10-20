@@ -827,6 +827,11 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     
     self.fifo = fifo
     self.queue = queue
+
+  def push_to_fifo(self,push_these):
+    self.fifo.push_all(push_these)
+
+
 class QueueLoader(multiprocessing.Process):
   def __init__(self,fifo,queue):
     multiprocessing.Process.__init__(self)
