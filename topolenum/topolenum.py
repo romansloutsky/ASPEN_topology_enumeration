@@ -846,7 +846,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
       self.workspace.append(pickle.loads(pickled_assembly))
   
   def push_to_fifo(self,push_these):
-    self.fifo.push_all(push_these)
+    self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
+                       for item in push_these)
 
 
 class QueueLoader(multiprocessing.Process):
