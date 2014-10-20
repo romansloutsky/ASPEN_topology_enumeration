@@ -705,7 +705,6 @@ class AssemblyWorkspace(object):
       self.fifo.push(item)
   
   def update_workspace(self,new_assemblies=None):
-    self.top_off_workspace()
     if new_assemblies is not None:
       if len(self.workspace) < self.max_workspace_size:
         while len(self.workspace) < self.max_workspace_size:
@@ -715,6 +714,7 @@ class AssemblyWorkspace(object):
             break
       if new_assemblies:
         self.push_to_fifo(new_assemblies)
+    self.top_off_workspace()
   
   def process_extended_assembly(self,assembly):
     if assembly.complete:
