@@ -684,6 +684,9 @@ class AssemblyWorkspace(object):
     
     self.fifo = fifo
   
+  def update_min_score(self):
+    self.curr_min_score = self.accepted_assemblies[-1].score
+  
   def top_off_workspace(self):
     if self.fifo is None or isinstance(self.fifo,str):
       return
@@ -724,7 +727,7 @@ class AssemblyWorkspace(object):
         self.accepted_assemblies.sort(key=lambda x: x.score,reverse=True)
         while len(self.accepted_assemblies) > self.num_requested_trees:
           self.rejected_assemblies.append(self.accepted_assemblies.pop())
-        self.curr_min_score = self.accepted_assemblies[-1].score
+        self.update_min_score()
       else:
         self.rejected_assemblies.append(assembly)
       return
