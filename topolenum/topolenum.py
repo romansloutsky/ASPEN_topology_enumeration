@@ -864,7 +864,6 @@ class QueueLoader(multiprocessing.Process):
     self.daemon = True
   
   def run(self):
-    multiprocessing.Process.run(self)
     self.fifo.start_OUT_end()
     while True:
       popped = self.fifo.pop()
