@@ -819,6 +819,20 @@ class SharedFIFOfile(FIFOfile):
     self._sync_safe_method_call(FIFOfile.close,tuple())
 
 
+class SharedCladeReprTracker(CladeReprTracker):
+  def __init__(self,leaves,shared_dict):
+    self.encountered = shared_dict
+    self.leaves = {leaf:i+1 for i,leaf in enumerate(sorted(leaves))}
+  
+  def already_encountered(self, cladeset):
+    csrepr = self.make_str_repr(cladeset)
+    if csrepr in self.encountered:
+      return True
+    else:
+      self.encountered[csrepr] = None
+      return False
+
+
 class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   class AssemblyWorkFinished(Exception):
     pass
