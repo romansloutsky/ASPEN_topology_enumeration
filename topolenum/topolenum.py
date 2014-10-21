@@ -721,8 +721,7 @@ class AssemblyWorkspace(object):
       if len(self.accepted_assemblies) < self.num_requested_trees\
                                       or assembly.score > self.curr_min_score:
         self.accepted_assemblies.append(assembly)
-        self.accepted_assemblies = sorted(self.accepted_assemblies,
-                                          key=lambda x: x.score,reverse=True)
+        self.accepted_assemblies.sort(key=lambda x: x.score,reverse=True)
         while len(self.accepted_assemblies) > self.num_requested_trees:
           self.rejected_assemblies.append(self.accepted_assemblies.pop())
         self.curr_min_score = self.accepted_assemblies[-1].score
@@ -752,6 +751,7 @@ class AssemblyWorkspace(object):
     if not self.reached_num_requested_trees:
       if len(self.accepted_assemblies) == self.num_requested_trees:
         self.workspace = [asbly for asbly in self.workspace if asbly.score > self.curr_min_score]
+        self.reached_num_requested_trees = True
     self.update_workspace()
     self.iternum += 1
 
