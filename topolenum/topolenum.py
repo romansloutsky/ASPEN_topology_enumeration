@@ -850,7 +850,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     
     self.num_requested_trees = num_requested_trees
     self.reached_num_requested_trees = False
-    self.curr_min_score = shared_min_score_value
+    self._curr_min_score = shared_min_score_value
     
     self.iternum = 0
     
@@ -859,6 +859,10 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self.fifo = fifo
     self.queue = queue
 
+  @property
+  def curr_min_score(self):
+    return self._curr_min_score.value
+  
   def top_off_workspace(self):
     while len(self.workspace) < self.max_workspace_size:
       try:
