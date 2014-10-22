@@ -917,3 +917,41 @@ class QueueLoader(multiprocessing.Process):
     return
 
 
+class AssemblerProcess(multiprocessing.Process):
+  def __init__(self,queue,shared_accepted_assemblies,shared_encountered_assemblies_dict,
+               shared_min_score,pass_to_workspace,max_iter):
+    multiprocessing.Process.__init__(self)
+    
+    self.accepted_assemblies = shared_accepted_assemblies
+    self.encountered_assemblies_dict = shared_encountered_assemblies_dict
+    self.min_score = shared_min_score
+    self.queue = queue
+    self.fifo = SharedFIFOfile()
+    self.pass_to_workspace = pass_to_workspace
+    self.max_iter = max_iter
+  
+  def run(self):
+    self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,
+                                                  self.min_score,
+                                                  self.accepted_assemblies,
+                                                  self.encountered_assemblies_dict,
+                                                  *self.pass_to_workspace.args,
+                                                  **self.pass_to_workspace.kwargs)
+    self.queue_loader_p = QueueLoader(self.fifo,self.queue)
+    self.queue_loader_p.start()
+    self.fifo.start_IN_end()
+    try:
+      iter_result = None
+      iter_counter = 0
+      while iter_result != 'FINISHED' and iter_counter < self.max_iter:
+        iter_counter += 1
+        iter_result = self.assemblies.iterate()
+      self.fifo.push('SHUTDOWN')
+      self.queue_loader_p.join(timeout=15)
+    except:
+      self.queue_loader_p.terminate()
+      raise
+    finally:
+      self.fifo.close()
+    return self.assemblies
+
