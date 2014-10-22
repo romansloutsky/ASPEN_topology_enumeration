@@ -837,13 +837,24 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   class AssemblyWorkFinished(Exception):
     pass
   
-  def __init__(self,fifo,queue,
-               pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
-               absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=1000):
-    AssemblyWorkspace.__init__(self,pwleafdist_histograms,constraint_freq_cutoff,
-                               leaves_to_assemble,absolute_freq_cutoff,
-                               num_requested_trees,max_workspace_size,
-                               keep_alive_when_pickling=False)
+  def __init__(self,fifo,queue,shared_min_score_value,
+               shared_accepted_assemblies_list,shared_encountered_assemblies_dict,
+               leaves_to_assemble,seed_assembly,num_requested_trees=1000,
+               max_workspace_size=1000):
+    self.workspace = [seed_assembly]
+    
+    self.accepted_assemblies = shared_accepted_assemblies_list
+    self.rejected_assemblies = []
+    self.encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
+                                                shared_encountered_assemblies_dict)
+    
+    self.num_requested_trees = num_requested_trees
+    self.reached_num_requested_trees = False
+    self.curr_min_score = shared_min_score_value
+    
+    self.iternum = 0
+    
+    self.max_workspace_size = max_workspace_size
     
     self.fifo = fifo
     self.queue = queue
