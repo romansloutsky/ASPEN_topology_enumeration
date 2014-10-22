@@ -863,6 +863,9 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def curr_min_score(self):
     return self._curr_min_score.value
   
+  def update_min_score(self):
+    self._curr_min_score.value = self.accepted_assemblies[-1].score
+  
   def top_off_workspace(self):
     while len(self.workspace) < self.max_workspace_size:
       try:
