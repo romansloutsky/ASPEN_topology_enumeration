@@ -884,6 +884,20 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
                        for item in push_these)
   
+  def process_extended_assembly(self,assembly):
+    if assembly.complete:
+      if assembly.score > self.curr_min_score:
+        self.score_submission_queue.put(assembly.score)
+        self.accepted_assemblies.append(assembly)
+      else:
+        self.rejected_assemblies.append(assembly)
+      for i in xrange(len(self.accepted_assemblies)-1,-1,-1):
+        if self.accepted_assemblies[i].score < self.curr_min_score:
+          self.rejected_assemblies.append(self.accepted_assemblies.pop(i))
+      return
+    else:
+      return assembly
+  
   def iterate(self):
     try:
       AssemblyWorkspace.iterate(self)
