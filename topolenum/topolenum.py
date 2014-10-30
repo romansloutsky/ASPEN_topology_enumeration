@@ -962,3 +962,29 @@ class AssemblerProcess(multiprocessing.Process):
       self.fifo.close()
     return self.assemblies
 
+
+def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
+                         constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
+                         max_workspace_size=10000,max_queue_size=10000,
+                         num_requested_topologies=1000,num_workers=1,max_iter=1000000):
+  assembly_queue_manager = multiprocessing.Manager()
+  queue = assembly_queue_manager.Queue(max_queue_size)
+  
+  encountered_assemblies_manager = multiprocessing.Manager()
+  encountered_assemblies_dict = encountered_assemblies_manager.dict()
+  
+  seed_assembly = TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
+                               leaves_to_assemble,absolute_freq_cutoff,
+                               keep_alive_when_pickling=False)
+  try:
+    scores_queue = multiprocessing.Queue()
+    for p in procs:
+      p.start()
+  except Exception as e:
+    for p in procs:
+      p.terminate()
+    raise
+  finally:
+    assembly_queue_manager.shutdown()
+    encountered_assemblies_manager.shutdown()
+  return results
