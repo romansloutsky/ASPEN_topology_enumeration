@@ -927,7 +927,8 @@ class QueueLoader(multiprocessing.Process):
 
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
-               score_submission_queue,pass_to_workspace,max_iter):
+               score_submission_queue,pass_to_workspace,
+               finished_EV,shutdown_EV,max_iter):
     multiprocessing.Process.__init__(self)
     
     self.queue = queue
@@ -937,6 +938,8 @@ class AssemblerProcess(multiprocessing.Process):
     self.fifo = SharedFIFOfile()
     self.pass_to_workspace = pass_to_workspace
     self.max_iter = max_iter
+    self.finished = finished_EV
+    self.shutdown = shutdown_EV
   
   def run(self):
     self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
@@ -950,9 +953,15 @@ class AssemblerProcess(multiprocessing.Process):
     try:
       iter_result = None
       iter_counter = 0
-      while iter_result != 'FINISHED' and iter_counter < self.max_iter:
+      while not self.shutdown.is_set() and iter_counter < self.max_iter:
         iter_counter += 1
         iter_result = self.assemblies.iterate()
+        if iter_result == 'FINISHED':
+          self.finished.set()
+          if self.shutdown.wait(5):
+            break
+          else:
+            continue
       self.fifo.push('SHUTDOWN')
       self.queue_loader_p.join(timeout=15)
     except:
@@ -977,6 +986,8 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
                                leaves_to_assemble,absolute_freq_cutoff,
                                keep_alive_when_pickling=False)
   try:
+    finished_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
+    shutdown_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
     scores_queue = multiprocessing.Queue()
     for p in procs:
       p.start()
