@@ -837,20 +837,19 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   class AssemblyWorkFinished(Exception):
     pass
   
-  def __init__(self,fifo,queue,shared_min_score_value,
-               shared_accepted_assemblies_list,shared_encountered_assemblies_dict,
-               leaves_to_assemble,seed_assembly,num_requested_trees=1000,
-               max_workspace_size=1000):
+  def __init__(self,fifo,queue,min_score,shared_encountered_assemblies_dict,
+               leaves_to_assemble,seed_assembly,
+               num_requested_trees=1000,max_workspace_size=1000):
     self.workspace = [seed_assembly]
     
-    self.accepted_assemblies = shared_accepted_assemblies_list
+    self.accepted_assemblies = []
     self.rejected_assemblies = []
     self.encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
                                                 shared_encountered_assemblies_dict)
     
     self.num_requested_trees = num_requested_trees
     self.reached_num_requested_trees = False
-    self._curr_min_score = shared_min_score_value
+    self._curr_min_score = min_score
     
     self.iternum = 0
     
@@ -918,22 +917,19 @@ class QueueLoader(multiprocessing.Process):
 
 
 class AssemblerProcess(multiprocessing.Process):
-  def __init__(self,queue,shared_accepted_assemblies,shared_encountered_assemblies_dict,
-               shared_min_score,pass_to_workspace,max_iter):
+  def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
+               pass_to_workspace,max_iter):
     multiprocessing.Process.__init__(self)
     
-    self.accepted_assemblies = shared_accepted_assemblies
-    self.encountered_assemblies_dict = shared_encountered_assemblies_dict
-    self.min_score = shared_min_score
     self.queue = queue
+    self.min_score = shared_min_score
+    self.encountered_assemblies_dict = shared_encountered_assemblies_dict
     self.fifo = SharedFIFOfile()
     self.pass_to_workspace = pass_to_workspace
     self.max_iter = max_iter
   
   def run(self):
-    self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,
-                                                  self.min_score,
-                                                  self.accepted_assemblies,
+    self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
                                                   self.encountered_assemblies_dict,
                                                   *self.pass_to_workspace.args,
                                                   **self.pass_to_workspace.kwargs)
