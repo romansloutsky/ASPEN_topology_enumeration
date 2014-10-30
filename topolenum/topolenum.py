@@ -838,11 +838,12 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     pass
   
   def __init__(self,fifo,queue,min_score,shared_encountered_assemblies_dict,
-               leaves_to_assemble,seed_assembly,
+               score_submission_queue,leaves_to_assemble,seed_assembly,
                num_requested_trees=1000,max_workspace_size=1000):
     self.workspace = [seed_assembly]
     
     self.accepted_assemblies = []
+    self.score_submission_queue = score_submission_queue
     self.rejected_assemblies = []
     self.encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
                                                 shared_encountered_assemblies_dict)
@@ -918,12 +919,13 @@ class QueueLoader(multiprocessing.Process):
 
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
-               pass_to_workspace,max_iter):
+               score_submission_queue,pass_to_workspace,max_iter):
     multiprocessing.Process.__init__(self)
     
     self.queue = queue
     self.min_score = shared_min_score
     self.encountered_assemblies_dict = shared_encountered_assemblies_dict
+    self.score_submission_queue = score_submission_queue
     self.fifo = SharedFIFOfile()
     self.pass_to_workspace = pass_to_workspace
     self.max_iter = max_iter
@@ -931,6 +933,7 @@ class AssemblerProcess(multiprocessing.Process):
   def run(self):
     self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
                                                   self.encountered_assemblies_dict,
+                                                  self.score_submission_queue,
                                                   *self.pass_to_workspace.args,
                                                   **self.pass_to_workspace.kwargs)
     self.queue_loader_p = QueueLoader(self.fifo,self.queue)
