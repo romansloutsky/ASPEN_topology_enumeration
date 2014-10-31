@@ -928,7 +928,7 @@ class QueueLoader(multiprocessing.Process):
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
                score_submission_queue,pass_to_workspace,
-               finished_EV,shutdown_EV,max_iter):
+               finished_EV,shutdown_EV,results_fifo,max_iter):
     multiprocessing.Process.__init__(self)
     
     self.queue = queue
@@ -940,6 +940,7 @@ class AssemblerProcess(multiprocessing.Process):
     self.max_iter = max_iter
     self.finished = finished_EV
     self.shutdown = shutdown_EV
+    self.results_fifo = results_fifo
   
   def run(self):
     self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
@@ -969,7 +970,11 @@ class AssemblerProcess(multiprocessing.Process):
       raise
     finally:
       self.fifo.close()
-    return self.assemblies
+    self.results_fifo.start_IN_end()
+    self.results_fifo.push_all(self.assemblies.accepted_assemblies)
+    self.results_fifo.push('SHUTDOWN')
+    self.results_fifo.close()
+    return
 
 
 def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
@@ -994,12 +999,15 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
   try:
     finished_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
     shutdown_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
+    
+    results_fifos = [SharedFIFOfile() for i in xrange(num_workers)]
+    
     scores_queue = multiprocessing.Queue()
     min_score = multiprocessing.Value('d',-sys.float_info.max)
     
     procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,scores_queue,
                               workspace_args,finished_event_vars[i],
-                              shutdown_event_vars[i],max_iter)
+                              shutdown_event_vars[i],results_fifos[i],max_iter)
              for i in xrange(num_workers)]
     for p in procs:
       p.start()
@@ -1019,6 +1027,23 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     
     for sev in shutdown_event_vars:
       sev.set()
+    
+    results = []
+    for rf in results_fifos:
+      rf.start_OUT_end()
+      while True:
+        popped = rf.pop()
+        if popped is None:
+          continue
+        elif popped == 'SHUTDOWN':
+          break
+        else:
+          results.append(popped)
+      rf.close()
+        
+    results.sort(key=lambda x: x.score,reverse=True)
+    while len(results) > num_requested_topologies:
+      results.pop()
     
     for p in procs:
       p.join()
