@@ -990,10 +990,12 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
                                                                seed_assembly,
                                                                num_requested_topologies,
                                                                max_workspace_size),{})
+  accepted_scores = []
   try:
     finished_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
     shutdown_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
     scores_queue = multiprocessing.Queue()
+    min_score = multiprocessing.Value('d',-sys.float_info.max)
     
     procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,scores_queue,
                               workspace_args,finished_event_vars[i],
@@ -1004,6 +1006,14 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     while any(not fev.is_set() for fev in finished_event_vars):
       try:
         proposed_score = scores_queue.get(timeout=0.05)
+        if len(accepted_scores) < num_requested_topologies\
+                                      or proposed_score > accepted_scores[-1]:
+          accepted_scores.append(proposed_score)
+          accepted_scores.sort(reverse=True)
+          while len(accepted_scores) > num_requested_topologies:
+            accepted_scores.pop()
+          if len(accepted_scores) == num_requested_topologies:
+            min_score.value = accepted_scores[-1]
       except Queue.Empty:
         continue
     
