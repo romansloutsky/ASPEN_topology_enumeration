@@ -934,7 +934,7 @@ class QueueLoader(multiprocessing.Process):
 
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
-               score_submission_queue,pass_to_workspace,
+               score_submission_queue,seed_assembly,pass_to_workspace,
                finished_EV,shutdown_EV,results_fifo,max_iter):
     multiprocessing.Process.__init__(self)
     
@@ -944,6 +944,7 @@ class AssemblerProcess(multiprocessing.Process):
     self.score_submission_queue = score_submission_queue
     self.fifo = SharedFIFOfile()
     self.pass_to_workspace = pass_to_workspace
+    self.pass_to_workspace.kwargs['seed_assembly'] = seed_assembly
     self.max_iter = max_iter
     self.finished = finished_EV
     self.shutdown = shutdown_EV
@@ -994,14 +995,19 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
   encountered_assemblies_manager = multiprocessing.Manager()
   encountered_assemblies_dict = encountered_assemblies_manager.dict()
   
-  seed_assembly = TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
+  zeroth_assembly = TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
                                leaves_to_assemble,absolute_freq_cutoff,
                                keep_alive_when_pickling=False)
+  seed_assemblies = [zeroth_assembly]
+  while len(seed_assemblies) < num_workers:
+    seed_assemblies = [a for old_a in seed_assemblies
+                       for a in old_a.generate_extensions(
+                                SharedCladeReprTracker(leaves_to_assemble,
+                                                       encountered_assemblies_dict))]
   
-  workspace_args = namedtuple('ArgsKwargs',['args','kwargs'])((leaves_to_assemble,
-                                                               seed_assembly,
-                                                               num_requested_topologies,
-                                                               max_workspace_size),{})
+  workspace_args = namedtuple('ArgsKwargs',['args','kwargs'])((leaves_to_assemble,),
+                                    {'num_requested_trees':num_requested_topologies,
+                                     'max_workspace_size':max_workspace_size})
   accepted_scores = []
   try:
     finished_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
@@ -1012,10 +1018,14 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     scores_queue = multiprocessing.Queue()
     min_score = multiprocessing.Value('d',-sys.float_info.max)
     
-    procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,scores_queue,
-                              workspace_args,finished_event_vars[i],
-                              shutdown_event_vars[i],results_fifos[i],max_iter)
+    procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,
+                              scores_queue,seed_assemblies.pop(),workspace_args,
+                              finished_event_vars[i],shutdown_event_vars[i],
+                              results_fifos[i],max_iter)
              for i in xrange(num_workers)]
+    while seed_assemblies:
+      queue.put(pickle.dumps(seed_assemblies.pop(),pickle.HIGHEST_PROTOCOL))
+    
     for p in procs:
       p.start()
     while any(not fev.is_set() for fev in finished_event_vars):
