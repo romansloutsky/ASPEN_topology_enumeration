@@ -770,6 +770,8 @@ class SharedFIFOfile(FIFOfile):
     self.clear = self.event.clear
     self.wait = self.event.wait
     
+    self.read_handle_closed = multiprocessing.Event()
+    
     if name == 'use_tempfile':
       self.get_filename,self.send_filename = multiprocessing.Pipe(duplex=False)
   
@@ -813,7 +815,12 @@ class SharedFIFOfile(FIFOfile):
     self.set()
   
   def close(self):
-    self._sync_safe_method_call(FIFOfile.close,tuple())
+    if hasattr(self,'_rh'):
+      self._rh.close()
+      self.read_handle_closed.set()
+    if hasattr(self,'_wh'):
+      self.read_handle_closed.wait()
+      self._wh.close()
 
 
 class SharedCladeReprTracker(CladeReprTracker):
