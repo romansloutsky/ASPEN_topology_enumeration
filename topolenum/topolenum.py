@@ -1001,6 +1001,17 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
              for i in xrange(num_workers)]
     for p in procs:
       p.start()
+    while any(not fev.is_set() for fev in finished_event_vars):
+      try:
+        proposed_score = scores_queue.get(timeout=0.05)
+      except Queue.Empty:
+        continue
+    
+    for sev in shutdown_event_vars:
+      sev.set()
+    
+    for p in procs:
+      p.join()
   except Exception as e:
     for p in procs:
       p.terminate()
