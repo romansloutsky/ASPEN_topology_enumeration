@@ -1053,7 +1053,9 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
       results.pop()
     
     for p in procs:
-      p.join()
+      p.join(timeout=10)
+      if p.is_alive():
+        p.terminate()
   except Exception as e:
     for p in procs:
       p.terminate()
@@ -1062,3 +1064,4 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     assembly_queue_manager.shutdown()
     encountered_assemblies_manager.shutdown()
   return results
+
