@@ -985,10 +985,20 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
   seed_assembly = TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
                                leaves_to_assemble,absolute_freq_cutoff,
                                keep_alive_when_pickling=False)
+  
+  workspace_args = namedtuple('ArgsKwargs',['args','kwargs'])((leaves_to_assemble,
+                                                               seed_assembly,
+                                                               num_requested_topologies,
+                                                               max_workspace_size),{})
   try:
     finished_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
     shutdown_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
     scores_queue = multiprocessing.Queue()
+    
+    procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,scores_queue,
+                              workspace_args,finished_event_vars[i],
+                              shutdown_event_vars[i],max_iter)
+             for i in xrange(num_workers)]
     for p in procs:
       p.start()
   except Exception as e:
