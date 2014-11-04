@@ -873,13 +873,16 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
       try:
         pickled_assembly = self.queue.get_nowait()
       except Queue.Empty:
-        if self.fifo.is_set():
-          pickled_assembly = self.queue.get(timeout=5)
+        if self.workspace:
+          break
         else:
-          if not self.workspace:
-            raise self.AssemblyWorkFinished
-          else:
-            break
+          try:
+            pickled_assembly = self.queue.get(timeout=5)
+          except Queue.Empty:
+            if not self.fifo.is_set():
+              raise self.AssemblyWorkFinished
+            else:
+              continue
       self.workspace.append(pickle.loads(pickled_assembly))
   
   def push_to_fifo(self,push_these):
