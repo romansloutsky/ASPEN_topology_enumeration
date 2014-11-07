@@ -908,6 +908,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
       AssemblyWorkspace.iterate(self)
     except self.AssemblyWorkFinished:
       return 'FINISHED'
+    finally:
+      gc.collect()
 
 
 class QueueLoader(multiprocessing.Process):
