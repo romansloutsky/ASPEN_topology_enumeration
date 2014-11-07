@@ -939,7 +939,7 @@ class QueueLoader(multiprocessing.Process):
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
                score_submission_queue,seed_assembly,pass_to_workspace,
-               finished_EV,shutdown_EV,results_fifo,max_iter):
+               finished_EV,shutdown_EV,results_fifo):
     multiprocessing.Process.__init__(self)
     
     self.queue = queue
@@ -949,7 +949,7 @@ class AssemblerProcess(multiprocessing.Process):
     self.fifo = SharedFIFOfile()
     self.pass_to_workspace = pass_to_workspace
     self.seed_assembly = seed_assembly
-    self.max_iter = max_iter
+    
     self.finished = finished_EV
     self.shutdown = shutdown_EV
     self.results_fifo = results_fifo
@@ -967,7 +967,7 @@ class AssemblerProcess(multiprocessing.Process):
     try:
       iter_result = None
       iter_counter = 0
-      while not self.shutdown.is_set() and iter_counter < self.max_iter:
+      while not self.shutdown.is_set():
         iter_counter += 1
         iter_result = self.assemblies.iterate()
         if iter_result == 'FINISHED':
@@ -993,7 +993,7 @@ class AssemblerProcess(multiprocessing.Process):
 def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
                          constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
                          max_workspace_size=10000,max_queue_size=10000,
-                         num_requested_topologies=1000,num_workers=1,max_iter=1000000):
+                         num_requested_topologies=1000,num_workers=1):
   assembly_queue_manager = multiprocessing.Manager()
   queue = assembly_queue_manager.Queue(max_queue_size)
   
@@ -1026,7 +1026,7 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,
                               scores_queue,seed_assemblies.pop(),workspace_args,
                               finished_event_vars[i],shutdown_event_vars[i],
-                              results_fifos[i],max_iter)
+                              results_fifos[i])
              for i in xrange(num_workers)]
     while seed_assemblies:
       queue.put(pickle.dumps(seed_assemblies.pop(),pickle.HIGHEST_PROTOCOL))
