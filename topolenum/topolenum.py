@@ -267,7 +267,7 @@ class TreeAssembly(object):
                                             LPDF(pair_histogram[0],score[0],score[1])
                                             # for every histogram of pw distances for a leaf pair ...
                                             for pair_histogram in
-                                            # present in a built-in-place subset of
+                                            # present in a built-on-the-fly subset of
                                             # the full histogram for that pair ...
         [(leafpair,[dist for i,dist in enumerate(distances) if
                     # of distances ordered by freq such that the sum of their freqs
