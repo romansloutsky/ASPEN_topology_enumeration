@@ -1,4 +1,5 @@
 import sys
+import os.path
 import math
 import itertools
 import tempfile
@@ -10,6 +11,7 @@ import cPickle as pickle
 from sys import stderr
 from collections import defaultdict,namedtuple,Counter
 from Bio.Phylo.BaseTree import Tree, Clade
+from .tempdir import TemporaryDirectory
 from .tree import T as T_BASE
 
 
@@ -591,30 +593,94 @@ class TreeAssembly(object):
 
 
 class FIFOfile(object):
-  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True,open_rh=True):
-    if name == 'use_tempfile':
-      self._wh = tempfile.NamedTemporaryFile('w'+mode,bufsize=wbuffering,dir='.',delete=delete)
-      self.name = self._wh.name
-    else:
-      self.name = name
-      self._wh = open(self.name,'w'+mode,wbuffering)
-    if open_rh:
-      self._rh = open(self.name,'r'+mode,rbuffering)
+  class TMPFILE(object):
+    instcount = 0
+    def __new__(self,cls,*args,**kwargs):
+      cls.instcount += 1
+      return object.__new__(self,cls,*args,**kwargs)
+    
+    def __init__(self):
+      self.rh = tempfile.NamedTemporaryFile('r'+self.mode,self.rbuf,
+                                            suffix=self.suffix,
+                                            prefix='FIFOfile'+\
+                                            str(self.inscount)+'_',
+                                            dir=self.dir,delete=self.delete)
+      self.name = self.rh.name
+      self.wh = open(self.name,'w'+self.mode,self.wbuf)
+      self._size = 0.0
+      self.lines_since_size_check = 0
+    
+    @property
+    def size(self):
+      if self.lines_since_size_check > self.check_freq:
+        self._size = os.path.getsize(self.name)
+        self.lines_since_size_check = 0
+      return self._size
+    
+    def close(self):
+      self.wh.close()
+    
+    def discard(self):
+      self.rh.close()
+      assert os.path.exists(self.name) == False
+    
+  
+  def __init__(self,mode='b',wbuffering=0,rbuffering=0,delete=True,open_rh=True,
+               top_path='.',suffix='',max_file_size_GB=1.0,size_check_freq=100):
+    self.tmpdir_obj = TemporaryDirectory(dir=top_path,prefix='FIFOworkspace_',suffix=tmpdir_suff)
+    self.tmpdir_path = os.path.realpath(self.tmpdir.__enter__())
+    self.max_size = max_file_size_GB
+    
+    self.TMPFILE.mode = mode
+    self.TMPFILE.wbuf = wbuffering
+    self.TMPFILE.rbuf = rbuffering
+    self.TMPFILE.suffix = suffix
+    self.TMPFILE.delete = delete
+    self.TMPFILE.dir = self.tmpdir_path
+    self.TMPFILE.check_freq = size_check_freq
+    
+    self.current_file = self.TMPFILE()
+    self.file_spool = []
+    
+#     if name == 'use_tempfile':
+#       self._wh = tempfile.NamedTemporaryFile('w'+mode,bufsize=wbuffering,dir='.',delete=delete)
+#       self.name = self._wh.name
+#     else:
+#       self.name = name
+#       self._wh = open(self.name,'w'+mode,wbuffering)
+#     if open_rh:
+#       self._rh = open(self.name,'r'+mode,rbuffering)
+  
+  @property
+  def wh(self):
+    try:
+      current = self.file_spool[-1]
+    except IndexError:
+      current = self.current_file
+    if current.size > self.max_size:
+      current.close()
+      self.file_spool.append(self.TMPFILE())
+      current = self.file_spool[-1]
+    return current.wh
+  
+  @property
+  def rh(self):
+    return self.current_file.rh
   
   def pop(self):
     try:
-      result = pickle.load(self._rh)
+      result = pickle.load(self.rh)
     except EOFError:
       try:
-        self._rh.readline()
-        result = pickle.load(self._rh)
+        self.rh.readline()
+        result = pickle.load(self.rh)
       except EOFError:
-        self._rh.seek(self._rh.tell()) #Without this under Ubuntu get a pickling error
+        self.rh.seek(self.rh.tell()) #Without this under Ubuntu get a pickling error
         return None
     return result
   
   def push(self,item):
-    pickle.dump(item,self._wh,pickle.HIGHEST_PROTOCOL)
+    pickle.dump(item,self.wh,pickle.HIGHEST_PROTOCOL)
   
   def close(self):
     if hasattr(self,'_rh'):
