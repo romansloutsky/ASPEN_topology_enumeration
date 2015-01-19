@@ -60,6 +60,13 @@ class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
     self.assertSequenceEqual(patched_getsize.call_args_list,
                              [call(patched_NTF.return_value.name),
                               call(patched_NTF.return_value.name)],list)
+  
+  @patch('os.path.exists',return_value=False)
+  def test_file_discarding(self,patched_exists,patched_NTF):
+    tmpfile_instance = self.TMPFILE()
+    self.assertIs(tmpfile_instance.rh,patched_NTF.return_value)
+    tmpfile_instance.discard()
+    tmpfile_instance.rh.close.assert_called_once_with()
 
 
 if __name__ == "__main__":
