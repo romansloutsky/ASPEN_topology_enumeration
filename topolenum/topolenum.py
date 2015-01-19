@@ -599,6 +599,16 @@ class FIFOfile(object):
       cls.instcount += 1
       return object.__new__(self,cls,*args,**kwargs)
     
+    @classmethod
+    def init_class(cls,mode,wbuf,rbuf,suffix,delete,dir,check_freq):
+      cls.mode = mode
+      cls.wbuf = wbuf
+      cls.rbuf = rbuf
+      cls.suffix = suffix
+      cls.delete = delete
+      cls.dir = dir
+      cls.check_freq = check_freq
+    
     def __init__(self):
       self.rh = tempfile.NamedTemporaryFile('r'+self.mode,self.rbuf,
                                             suffix=self.suffix,
@@ -630,14 +640,9 @@ class FIFOfile(object):
     self.tmpdir_obj = TemporaryDirectory(dir=top_path,prefix='FIFOworkspace_',suffix=tmpdir_suff)
     self.tmpdir_path = os.path.realpath(self.tmpdir.__enter__())
     self.max_size = max_file_size_GB
-    
-    self.TMPFILE.mode = mode
-    self.TMPFILE.wbuf = wbuffering
-    self.TMPFILE.rbuf = rbuffering
-    self.TMPFILE.suffix = suffix
-    self.TMPFILE.delete = delete
-    self.TMPFILE.dir = self.tmpdir_path
-    self.TMPFILE.check_freq = size_check_freq
+    self.TMPFILE.init_class(mode,wbuffering,rbuffering,suffix,delete,
+                            os.path.realpath(self.tmpdir_obj.__enter__()),
+                            size_check_freq)
     
     self.current_file = self.TMPFILE()
     self.file_spool = []
