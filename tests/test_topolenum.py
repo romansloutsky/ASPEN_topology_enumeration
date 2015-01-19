@@ -23,6 +23,17 @@ class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
     patched_NTF.assert_called_with('rb',0,suffix='',prefix='FIFOfile002_',
                                    dir='/dummy/path',delete=True)
   
+  def test_spooling_and_file_spool_interaction(self,patched_NTF):
+    self.assertFalse(hasattr(self.TMPFILE,'file_spool'))
+    self.TMPFILE.start_spooling()
+    self.assertTrue(hasattr(self.TMPFILE,'file_spool'))
+    self.assertEqual(len(self.TMPFILE.file_spool),0)
+    tmpfile_instance = self.TMPFILE.spool()
+    self.assertEqual(len(self.TMPFILE.file_spool),1)
+    self.assertIs(tmpfile_instance,self.TMPFILE.pop_from_spool())
+    self.assertEqual(len(self.TMPFILE.file_spool),0)
+    self.assertIs(None,self.TMPFILE.pop_from_spool())
+  
   def test_writing_handle(self,patched_NTF):
     tmpfile_instance = self.TMPFILE()
     self.assertFalse(hasattr(tmpfile_instance,'wh'))

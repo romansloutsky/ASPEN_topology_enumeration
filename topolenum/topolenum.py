@@ -609,6 +609,22 @@ class FIFOfile(object):
       cls.check_freq = check_freq
       cls.instcount = 0
     
+    @classmethod
+    def start_spooling(cls):
+      cls.file_spool = []
+    
+    @classmethod
+    def spool(cls):
+      cls.file_spool.append(cls())
+      return cls.file_spool[-1]
+    
+    @classmethod
+    def pop_from_spool(cls):
+      if cls.file_spool:
+        return cls.file_spool.pop(0)
+      else:
+        return None
+    
     def __init__(self):
       self.rh = tempfile.NamedTemporaryFile('r'+self.mode,self.rbuf,
                                             suffix=self.suffix,
