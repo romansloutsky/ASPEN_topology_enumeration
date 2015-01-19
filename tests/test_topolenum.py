@@ -33,6 +33,22 @@ class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
       self.assertIs(tmpfile_instance.wh,patched_open.return_value)
     tmpfile_instance.close()
     tmpfile_instance.wh.close.assert_called_once_with()
+  
+  @patch('os.path.getsize',side_effect=[10,20])
+  def test_size_checking(self,patched_getsize,patched_NTF):
+    tmpfile_instance = self.TMPFILE()
+    self.assertSequenceEqual([tmpfile_instance.size for i in xrange(6)],
+                             [0.0,0.0,0.0,0.0,0.0,0.0])
+    patched_getsize.assert_not_called()
+    self.assertEqual(tmpfile_instance.size,10)
+    patched_getsize.assert_called_once_with(patched_NTF.return_value.name)
+    self.assertSequenceEqual([tmpfile_instance.size for i in xrange(6)],
+                             [10.0,10.0,10.0,10.0,10.0,10.0])
+    patched_getsize.assert_called_once_with(patched_NTF.return_value.name)
+    self.assertEqual(tmpfile_instance.size,20)
+    self.assertSequenceEqual(patched_getsize.call_args_list,
+                             [call(patched_NTF.return_value.name),
+                              call(patched_NTF.return_value.name)],list)
 
 
 if __name__ == "__main__":
