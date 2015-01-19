@@ -616,7 +616,6 @@ class FIFOfile(object):
                                             str(self.instcount).zfill(3)+'_',
                                             dir=self.dir,delete=self.delete)
       self.name = self.rh.name
-      self.wh = open(self.name,'w'+self.mode,self.wbuf)
       self._size = 0.0
       self.lines_since_size_check = 0
     
@@ -626,6 +625,9 @@ class FIFOfile(object):
         self._size = os.path.getsize(self.name)
         self.lines_since_size_check = 0
       return self._size
+    
+    def open(self):
+      self.wh = open(self.name,'w'+self.mode,self.wbuf)
     
     def close(self):
       self.wh.close()
