@@ -594,10 +594,9 @@ class TreeAssembly(object):
 
 class FIFOfile(object):
   class TMPFILE(object):
-    instcount = 0
-    def __new__(self,cls,*args,**kwargs):
+    def __new__(cls,*args,**kwargs):
       cls.instcount += 1
-      return object.__new__(self,cls,*args,**kwargs)
+      return object.__new__(cls,*args,**kwargs)
     
     @classmethod
     def init_class(cls,mode,wbuf,rbuf,suffix,delete,dir,check_freq):
@@ -608,12 +607,13 @@ class FIFOfile(object):
       cls.delete = delete
       cls.dir = dir
       cls.check_freq = check_freq
+      cls.instcount = 0
     
     def __init__(self):
       self.rh = tempfile.NamedTemporaryFile('r'+self.mode,self.rbuf,
                                             suffix=self.suffix,
                                             prefix='FIFOfile'+\
-                                            str(self.inscount)+'_',
+                                            str(self.instcount).zfill(3)+'_',
                                             dir=self.dir,delete=self.delete)
       self.name = self.rh.name
       self.wh = open(self.name,'w'+self.mode,self.wbuf)
