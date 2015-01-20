@@ -637,7 +637,7 @@ class FIFOfile(object):
     
     @property
     def size(self):
-      if self.lines_since_size_check > self.check_freq:
+      if self.lines_since_size_check >= self.check_freq:
         self._size = os.path.getsize(self.name)
         self.lines_since_size_check = 0
       else:
