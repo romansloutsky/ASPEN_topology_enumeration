@@ -86,6 +86,33 @@ class TestFIFOfileBaseClass(unittest.TestCase):
                                            suffix='dummy_suffix')
     patched_TMPFILE_initcls.assert_called_once_with('b',0,0,'dummy_suffix',True,
                                                     '/dummy/path',100)
+  
+  def test_starting_fifo_OUT_end(self,patched_NTF,patched_TmpDir,
+                                 patched_realpath,patched_exists):
+    fifo_obj = te.FIFOfile()
+    self.assertFalse(hasattr(te.FIFOfile.TMPFILE,'file_spool'))
+    patched_NTF.assert_not_called()
+    self.assertFalse(hasattr(fifo_obj,'current_reading_file'))
+    
+    fifo_obj.start_OUT_end()
+    patched_NTF.assert_called_once_with('rb',0,suffix='',prefix='FIFOfile001_',
+                                        dir='/dummy/path',delete=True)
+    self.assertSequenceEqual(te.FIFOfile.TMPFILE.file_spool,[],seq_type=list)
+    self.assertEqual(fifo_obj.current_reading_file.name,'dummy_temp_file')
+  
+  def test_starting_fifo_IN_end(self,patched_NTF,patched_TmpDir,
+                                patched_realpath,patched_exists):
+    fifo_obj = te.FIFOfile()
+    self.assertFalse(hasattr(fifo_obj,'current_writing_file'))
+    
+    fifo_obj.start_OUT_end()
+    with patch('__builtin__.open',mock_open(),create=True) as patched_open:
+      fifo_obj.start_IN_end()
+      self.assertIs(fifo_obj.current_writing_file,fifo_obj.current_reading_file)
+      patched_open.assert_called_once_with('dummy_temp_file','wb',0)
+      self.assertIs(fifo_obj.current_writing_file.wh,patched_open.return_value)
+
+
 if __name__ == "__main__":
   #import sys;sys.argv = ['', 'Test.testName']
   unittest.main()

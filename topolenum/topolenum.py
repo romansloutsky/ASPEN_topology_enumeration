@@ -664,6 +664,13 @@ class FIFOfile(object):
                             os.path.realpath(self.tmpdir_obj.__enter__()),
                             size_check_freq)
     
+  def start_OUT_end(self):
+    self.current_reading_file = self.TMPFILE()
+    self.TMPFILE.start_spooling()
+  
+  def start_IN_end(self):
+    self.current_writing_file = self.current_reading_file
+    self.current_writing_file.open()
   
   @property
   def wh(self):
