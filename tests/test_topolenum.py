@@ -117,9 +117,10 @@ class TestFIFOfileBaseClass(unittest.TestCase):
       self.assertIs(fifo_obj.current_writing_file.wh,patched_open.return_value)
   
   @patch('os.path.getsize',side_effect=[500.0,1100.0])
-  @patch('__builtin__.open')#,new=mock_open(),create=True)
-  def test_wh_retrieval(self,patched_open,patched_getsize,patched_NTF,
-                        patched_TmpDir,patched_realpath,patched_exists):
+  @patch('__builtin__.open')
+  def test_wh_retrieval_and_rollover(self,patched_open,patched_getsize,
+                                     patched_NTF,patched_TmpDir,
+                                     patched_realpath,patched_exists):
     def patched_NTF_side_effect(*args,**kwargs):
       return_val = Mock()
       return_val.name = kwargs['prefix']
