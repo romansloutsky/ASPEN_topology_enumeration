@@ -7,6 +7,7 @@ from topolenum import topolenum as te
 class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
   
   def setUp(self):
+    reload(te)
     self.TMPFILE = te.FIFOfile.TMPFILE
     self.TMPFILE.init_class(mode='b',wbuf=0,rbuf=0,suffix='',delete=True,
                             dir='/dummy/path',check_freq=5)
@@ -74,6 +75,9 @@ class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
 @patch('topolenum.topolenum.TemporaryDirectory')
 @patch('tempfile.NamedTemporaryFile',**{'return_value.name':'dummy_temp_file'})
 class TestFIFOfileBaseClass(unittest.TestCase):
+  
+  def setUp(self):
+    reload(te)
   
   @patch('topolenum.topolenum.FIFOfile.TMPFILE.init_class')
   def test_tmpdir_creation_and_TMPFILE_class_init(self,patched_TMPFILE_initcls,
