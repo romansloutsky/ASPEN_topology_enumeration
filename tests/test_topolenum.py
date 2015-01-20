@@ -1,5 +1,5 @@
 import unittest
-from mock import patch,call,mock_open
+from mock import patch,call,mock_open,Mock
 from topolenum import topolenum as te
 
 
@@ -115,6 +115,68 @@ class TestFIFOfileBaseClass(unittest.TestCase):
       self.assertIs(fifo_obj.current_writing_file,fifo_obj.current_reading_file)
       patched_open.assert_called_once_with('dummy_temp_file','wb',0)
       self.assertIs(fifo_obj.current_writing_file.wh,patched_open.return_value)
+  
+  @patch('os.path.getsize',side_effect=[500.0,1100.0])
+  @patch('__builtin__.open')#,new=mock_open(),create=True)
+  def test_wh_retrieval(self,patched_open,patched_getsize,patched_NTF,
+                        patched_TmpDir,patched_realpath,patched_exists):
+    def patched_NTF_side_effect(*args,**kwargs):
+      return_val = Mock()
+      return_val.name = kwargs['prefix']
+      return return_val
+    patched_NTF.side_effect = patched_NTF_side_effect
+    
+    def assert_no_rollover():
+      self.assertFalse(fifo_obj.current_reading_file.wh.close.called)
+      self.assertFalse(patched_NTF.called)
+      self.assertFalse(patched_open.called)
+      self.assertIs(fifo_obj.current_writing_file,
+                    fifo_obj.current_reading_file)
+      self.assertSequenceEqual(fifo_obj.TMPFILE.file_spool,[],seq_type=list)
+    
+    # Start up FIFO and clear out calls to mocks
+    fifo_obj = te.FIFOfile(max_file_size_GB=1000.0,size_check_freq=2)
+    fifo_obj.start_OUT_end()
+    fifo_obj.start_IN_end()
+    patched_NTF.reset_mock()
+    patched_open.reset_mock()
+    
+    # First and second calls should trigger nothing
+    fifo_obj.wh
+    fifo_obj.wh
+    self.assertFalse(patched_getsize.called)
+    assert_no_rollover()
+    
+    # Third call should trigger file size check ...
+    fifo_obj.wh
+    patched_getsize.assert_called_once_with('FIFOfile001_')
+    patched_getsize.reset_mock()
+    self.assertEqual(fifo_obj.current_writing_file._size,500.0)
+    # ... but the file size should be insufficient to trigger a rollover
+    assert_no_rollover()
+    
+    # Fourth and fifth calls should, again, trigger nothing
+    fifo_obj.wh
+    fifo_obj.wh
+    self.assertFalse(patched_getsize.called)
+    assert_no_rollover()
+    
+    # Finally, sixth call should trigger a second size check ...
+    fifo_obj.wh
+    patched_getsize.assert_called_once_with('FIFOfile001_')
+    # ... and the returned file size should trigger a rollover to a new file, ...
+    fifo_obj.current_reading_file.wh.close.assert_called_once_with()
+    patched_NTF.assert_called_once_with('rb',0,prefix='FIFOfile002_',suffix='',
+                                        dir='/dummy/path',delete=True)
+    patched_open.assert_called_once_with('FIFOfile002_','wb',0)
+    self.assertSequenceEqual(fifo_obj.TMPFILE.file_spool,
+                             [fifo_obj.current_writing_file])
+    # ... meaning the reading and writing files are now different ...
+    self.assertIsNot(fifo_obj.current_writing_file,
+                     fifo_obj.current_reading_file)
+    self.assertEqual(fifo_obj.current_writing_file._size,0.0)
+    self.assertEqual(fifo_obj.current_reading_file._size,1100.0)
+    
 
 
 if __name__ == "__main__":

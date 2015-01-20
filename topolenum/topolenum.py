@@ -674,15 +674,11 @@ class FIFOfile(object):
   
   @property
   def wh(self):
-    try:
-      current = self.file_spool[-1]
-    except IndexError:
-      current = self.current_file
-    if current.size > self.max_size:
-      current.close()
-      self.file_spool.append(self.TMPFILE())
-      current = self.file_spool[-1]
-    return current.wh
+    if self.current_writing_file.size > self.max_size:
+      self.current_writing_file.close()
+      self.current_writing_file = self.TMPFILE.spool()
+      self.current_writing_file.open()
+    return self.current_writing_file.wh
   
   @property
   def rh(self):
