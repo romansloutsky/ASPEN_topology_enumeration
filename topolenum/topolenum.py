@@ -655,26 +655,15 @@ class FIFOfile(object):
       assert os.path.exists(self.name) == False
     
   
-  def __init__(self,mode='b',wbuffering=0,rbuffering=0,delete=True,open_rh=True,
-               top_path='.',suffix='',max_file_size_GB=1.0,size_check_freq=100):
-    self.tmpdir_obj = TemporaryDirectory(dir=top_path,prefix='FIFOworkspace_',suffix=tmpdir_suff)
-    self.tmpdir_path = os.path.realpath(self.tmpdir.__enter__())
+  def __init__(self,mode='b',wbuffering=0,rbuffering=0,delete=True,top_path='.',
+               suffix='',max_file_size_GB=1.0,size_check_freq=100):
+    self.tmpdir_obj = TemporaryDirectory(dir=top_path,prefix='FIFOworkspace_',
+                                         suffix=suffix)
     self.max_size = max_file_size_GB
     self.TMPFILE.init_class(mode,wbuffering,rbuffering,suffix,delete,
                             os.path.realpath(self.tmpdir_obj.__enter__()),
                             size_check_freq)
     
-    self.current_file = self.TMPFILE()
-    self.file_spool = []
-    
-#     if name == 'use_tempfile':
-#       self._wh = tempfile.NamedTemporaryFile('w'+mode,bufsize=wbuffering,dir='.',delete=delete)
-#       self.name = self._wh.name
-#     else:
-#       self.name = name
-#       self._wh = open(self.name,'w'+mode,wbuffering)
-#     if open_rh:
-#       self._rh = open(self.name,'r'+mode,rbuffering)
   
   @property
   def wh(self):

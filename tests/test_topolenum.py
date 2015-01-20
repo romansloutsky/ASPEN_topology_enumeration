@@ -69,6 +69,23 @@ class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
     tmpfile_instance.rh.close.assert_called_once_with()
 
 
+@patch('os.path.exists',return_value=False)
+@patch('os.path.realpath',return_value='/dummy/path')
+@patch('topolenum.topolenum.TemporaryDirectory')
+@patch('tempfile.NamedTemporaryFile',**{'return_value.name':'dummy_temp_file'})
+class TestFIFOfileBaseClass(unittest.TestCase):
+  
+  @patch('topolenum.topolenum.FIFOfile.TMPFILE.init_class')
+  def test_tmpdir_creation_and_TMPFILE_class_init(self,patched_TMPFILE_initcls,
+                                                  patched_NTF,patched_TmpDir,
+                                                  patched_realpath,
+                                                  patched_exists):
+    fifo_obj = te.FIFOfile(top_path='/dummy/top/path/arg',suffix='dummy_suffix')
+    patched_TmpDir.assert_called_once_with(dir='/dummy/top/path/arg',
+                                           prefix='FIFOworkspace_',
+                                           suffix='dummy_suffix')
+    patched_TMPFILE_initcls.assert_called_once_with('b',0,0,'dummy_suffix',True,
+                                                    '/dummy/path',100)
 if __name__ == "__main__":
   #import sys;sys.argv = ['', 'Test.testName']
   unittest.main()
