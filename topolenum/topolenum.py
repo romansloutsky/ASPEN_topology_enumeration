@@ -633,15 +633,15 @@ class FIFOfile(object):
                                             dir=self.dir,delete=self.delete)
       self.name = self.rh.name
       self._size = 0.0
-      self.lines_since_size_check = 0
+      self.access_count_since_size_check = 0
     
     @property
     def size(self):
-      if self.lines_since_size_check >= self.check_freq:
+      if self.access_count_since_size_check >= self.check_freq:
         self._size = os.path.getsize(self.name)
-        self.lines_since_size_check = 0
+        self.access_count_since_size_check = 0
       else:
-        self.lines_since_size_check += 1
+        self.access_count_since_size_check += 1
       return self._size
     
     def open(self):
