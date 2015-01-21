@@ -682,7 +682,20 @@ class FIFOfile(object):
   
   @property
   def rh(self):
-    return self.current_file.rh
+    old_pos = self.current_reading_file.rh.tell()
+    self.current_reading_file.rh.read(1)
+    if self.current_reading_file.rh.tell() == old_pos: # => cursor is at EOF
+      next_file = self.TMPFILE.pop_from_spool()
+      # We can't check whether the writing handle is closed because it may not
+      # exist in this process. However, if another file is already spooled,
+      # this file must be closed and safe to discard.
+      if next_file is not None:
+        self.current_reading_file.discard()
+        self.current_reading_file = next_file
+    else:
+      # If the reading operation successfully advanced the cursor, put it back!
+      self.current_reading_file.rh.seek(old_pos)
+    return self.current_reading_file.rh
   
   def pop(self):
     try:

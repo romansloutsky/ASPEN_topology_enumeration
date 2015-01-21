@@ -177,7 +177,53 @@ class TestFIFOfileBaseClass(unittest.TestCase):
                      fifo_obj.current_reading_file)
     self.assertEqual(fifo_obj.current_writing_file._size,0.0)
     self.assertEqual(fifo_obj.current_reading_file._size,1100.0)
+  
+  def test_rh_retrival_EOF_testing_and_discarding(self,patched_NTF,
+                                                  patched_TmpDir,
+                                                  patched_realpath,
+                                                  patched_exists):
+    patched_NTF.instances = []
+    def patched_NTF_side_effect(*args,**kwargs):
+      return_val = Mock(**{'tell.side_effect':[123,124,200,200]})
+      return_val.name = kwargs['prefix']
+      patched_NTF.instances.append(return_val)
+      return return_val
+    patched_NTF.side_effect = patched_NTF_side_effect
     
+    # Start up FIFO
+    fifo_obj = te.FIFOfile()
+    fifo_obj.start_OUT_end()
+    with patch('__builtin__.open',mock_open(),create=True):
+      fifo_obj.start_IN_end()
+    
+    # On first retrieval attempt rh has something to read
+    self.assertIs(fifo_obj.current_reading_file.rh,fifo_obj.rh)
+    self.assertIs(patched_NTF.instances[0],fifo_obj.current_reading_file.rh)
+    self.assertSequenceEqual(fifo_obj.current_reading_file.rh.tell.call_args_list,
+                             [call(),call()])
+    fifo_obj.current_reading_file.rh.read.assert_called_once_with(1)
+    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(123)
+    
+    # Spool second temp file to which rh can rollover
+    fifo_obj.current_writing_file = fifo_obj.TMPFILE.spool()
+    
+    # On second retrieval attempt rh is at EOF - cursor not advanced after read()
+    # At this point rh should rollover to next file
+    self.assertIsNot(fifo_obj.current_reading_file.rh,fifo_obj.rh)
+    self.assertIs(patched_NTF.instances[1],fifo_obj.current_reading_file.rh)
+    self.assertFalse(fifo_obj.current_reading_file.rh.seek.called)
+    patched_NTF.instances[0].close.assert_called_once_with()
+    
+    # On third retrieval attempt the rh of the new file has something to read
+    self.assertIs(fifo_obj.current_reading_file.rh,fifo_obj.rh)
+    self.assertIs(patched_NTF.instances[1],fifo_obj.current_reading_file.rh)
+    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(123)
+    
+    # On fourth retrieval attempt rh has nothing to read again, but also nothing
+    # to rollover to, so despite being at EOF the same handle is returned
+    self.assertIs(fifo_obj.current_reading_file.rh,fifo_obj.rh)
+    self.assertFalse(fifo_obj.current_reading_file.rh.close.called)
+    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(123)
 
 
 if __name__ == "__main__":
