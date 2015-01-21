@@ -184,7 +184,7 @@ class TestFIFOfileBaseClass(unittest.TestCase):
                                                   patched_exists):
     patched_NTF.instances = []
     def patched_NTF_side_effect(*args,**kwargs):
-      return_val = Mock(**{'tell.side_effect':[123,124,200,200]})
+      return_val = Mock(**{'tell.side_effect':[123,124,200,200,200]})
       return_val.name = kwargs['prefix']
       patched_NTF.instances.append(return_val)
       return return_val
@@ -211,19 +211,28 @@ class TestFIFOfileBaseClass(unittest.TestCase):
     # At this point rh should rollover to next file
     self.assertIsNot(fifo_obj.current_reading_file.rh,fifo_obj.rh)
     self.assertIs(patched_NTF.instances[1],fifo_obj.current_reading_file.rh)
-    self.assertFalse(fifo_obj.current_reading_file.rh.seek.called)
+    # After rollover to new file cursor is repositioned to first value seek()
+    # seek() returns when called on that file's handle
+    fifo_obj.current_reading_file.rh.seek.assert_called_with(123)
+    fifo_obj.current_reading_file.rh.seek.reset_mock()
     patched_NTF.instances[0].close.assert_called_once_with()
     
     # On third retrieval attempt the rh of the new file has something to read
     self.assertIs(fifo_obj.current_reading_file.rh,fifo_obj.rh)
     self.assertIs(patched_NTF.instances[1],fifo_obj.current_reading_file.rh)
-    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(123)
+    # Value 123 was already used up on previous retrieval of rh, so calls to
+    # seek() before and after a call to read() return 124 and 200 - still
+    # indicative of having something to read. Cursor is then returned to 124.
+    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(124)
+    fifo_obj.current_reading_file.rh.seek.reset_mock()
     
     # On fourth retrieval attempt rh has nothing to read again, but also nothing
     # to rollover to, so despite being at EOF the same handle is returned
     self.assertIs(fifo_obj.current_reading_file.rh,fifo_obj.rh)
     self.assertFalse(fifo_obj.current_reading_file.rh.close.called)
-    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(123)
+    # Calls to seek() returned 200 and 200, indicating EOF. A seek(200) call is
+    # still made to make sure handle is readable if new data is written.
+    fifo_obj.current_reading_file.rh.seek.assert_called_once_with(200)
 
 
 if __name__ == "__main__":

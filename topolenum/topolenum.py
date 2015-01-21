@@ -692,9 +692,20 @@ class FIFOfile(object):
       if next_file is not None:
         self.current_reading_file.discard()
         self.current_reading_file = next_file
-    else:
-      # If the reading operation successfully advanced the cursor, put it back!
-      self.current_reading_file.rh.seek(old_pos)
+        # Need to update old_pos after rolling over
+        old_pos = self.current_reading_file.rh.tell()
+    # If the reading operation successfully advanced the cursor, put it back!
+    # If it didn't, we still want to do the same thing:
+    #
+    # On some platforms performing a read operation when at EOF appears to
+    # put the file handle into a state where further read operations return
+    # nothing and fail to advance the cursor, even after additional writing.
+    # When in this state, calling handle.seek(pos), where pos is the output
+    # of handle.tell() seems to revert the handle to a normal reading state,
+    # fixing the problem.
+    #
+    # If rollover was successful, this will leave the cursor at the top
+    self.current_reading_file.rh.seek(old_pos)
     return self.current_reading_file.rh
   
   def pop(self):
