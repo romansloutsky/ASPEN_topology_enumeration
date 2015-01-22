@@ -1,5 +1,7 @@
 import unittest
-from mock import patch,call,mock_open,Mock
+import cPickle as pickle
+from cStringIO import StringIO
+from mock import patch,call,mock_open,Mock,PropertyMock
 from topolenum import topolenum as te
 
 
@@ -233,6 +235,19 @@ class TestFIFOfileBaseClass(unittest.TestCase):
     # Calls to seek() returned 200 and 200, indicating EOF. A seek(200) call is
     # still made to make sure handle is readable if new data is written.
     fifo_obj.current_reading_file.rh.seek.assert_called_once_with(200)
+  
+  def test_FIFO_pop(self,patched_NTF,patched_TmpDir,patched_realpath,
+                    patched_exists):
+    with patch.object(te.FIFOfile,'rh',PropertyMock(side_effect=\
+                        [StringIO(pickle.dumps('data1',protocol=2)),
+                         StringIO(''),
+                         StringIO(pickle.dumps('data2',protocol=2))]))\
+                                                                as patched_rh:
+      fifo_obj = te.FIFOfile()
+      fifo_obj.start_OUT_end()
+      self.assertEqual(fifo_obj.pop(),'data1')
+      self.assertEqual(fifo_obj.pop(),None)
+      self.assertEqual(fifo_obj.pop(),'data2')
 
 
 if __name__ == "__main__":
