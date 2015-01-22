@@ -248,6 +248,73 @@ class TestFIFOfileBaseClass(unittest.TestCase):
       self.assertEqual(fifo_obj.pop(),'data1')
       self.assertEqual(fifo_obj.pop(),None)
       self.assertEqual(fifo_obj.pop(),'data2')
+  
+  @patch('__builtin__.open')
+  def test_FIFO_close(self,patched_open,patched_NTF,patched_TmpDir,
+                      patched_realpath,patched_exists):
+    # Simple case: one temp file, spool is empty
+    fifo_obj = te.FIFOfile()
+    fifo_obj.start_OUT_end()
+    fifo_obj.start_IN_end()
+    
+    self.assertIs(fifo_obj.tmpdir_obj,patched_TmpDir.return_value)
+    self.assertIs(fifo_obj.current_reading_file,fifo_obj.current_writing_file)
+    self.assertIs(fifo_obj.current_reading_file.rh,patched_NTF.return_value)
+    self.assertIs(fifo_obj.current_writing_file.wh,patched_open.return_value)
+    fifo_obj.close()
+    patched_open.return_value.close.assert_called_once_with()
+    patched_NTF.return_value.close.assert_called_once_with()
+    patched_exists.assert_called_once_with('dummy_temp_file')
+    fifo_obj.tmpdir_obj.__exit__.assert_called_once_with(None,None,None)
+    
+    def prepare_return_val(name,append_here):
+      return_val = Mock()
+      return_val.name = name
+      return_val.closed = False
+      append_here.append(return_val)
+      return return_val
+    
+    patched_NTF.instances = []
+    def patched_NTF_side_effect(*args,**kwargs):
+      return prepare_return_val(kwargs['prefix'],patched_NTF.instances)
+    patched_NTF.side_effect = patched_NTF_side_effect
+    
+    patched_open.instances = []
+    def patched_open_side_effect(*args,**kwargs):
+      return prepare_return_val(args[0],patched_open.instances)
+    patched_open.side_effect = patched_open_side_effect
+    
+    # Alternative: reading and writing files are different, spool not empty
+    fifo_obj = te.FIFOfile()
+    fifo_obj.start_OUT_end()
+    fifo_obj.start_IN_end()
+    fifo_obj.current_writing_file.close()
+    for i in xrange(2):
+      fifo_obj.current_writing_file.wh.closed = True
+      fifo_obj.current_writing_file = fifo_obj.TMPFILE.spool()
+      fifo_obj.current_writing_file.open()
+    
+    self.assertIs(fifo_obj.tmpdir_obj,patched_TmpDir.return_value)
+    patched_TmpDir.return_value.reset_mock()
+    self.assertEqual(len(patched_NTF.instances),3)
+    self.assertEqual(len(patched_open.instances),3)
+    self.assertIsNot(fifo_obj.current_reading_file,
+                     fifo_obj.current_writing_file)
+    self.assertIs(fifo_obj.current_reading_file.rh,patched_NTF.instances[0])
+    self.assertIs(fifo_obj.current_writing_file.wh,patched_open.instances[2])
+    for i in xrange(3):
+      if i < 2:
+        self.assertIs(fifo_obj.TMPFILE.file_spool[i].rh,patched_NTF.instances[i+1])
+        self.assertIs(fifo_obj.TMPFILE.file_spool[i].wh,patched_open.instances[i+1])
+      self.assertEqual(patched_NTF.instances[i].name,
+                       patched_open.instances[i].name)
+    fifo_obj.close()
+    for i in xrange(3):
+      patched_open.instances[i].close.assert_called_once_with()
+      patched_NTF.instances[i].close.assert_called_once_with()
+    patched_exists.assert_has_calls([call('FIFOfile001_'),call('FIFOfile002_'),
+                                     call('FIFOfile003_')])
+    fifo_obj.tmpdir_obj.__exit__.assert_called_once_with(None,None,None)
 
 
 if __name__ == "__main__":

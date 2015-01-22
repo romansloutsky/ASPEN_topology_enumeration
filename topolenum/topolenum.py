@@ -719,10 +719,17 @@ class FIFOfile(object):
     pickle.dump(item,self.wh,pickle.HIGHEST_PROTOCOL)
   
   def close(self):
-    if hasattr(self,'_rh'):
-      self._rh.close()
-    if hasattr(self,'_wh'):
-      self._wh.close()
+    if self.current_reading_file is self.current_writing_file:
+      assert not self.TMPFILE.file_spool
+      self.current_writing_file.close()
+      self.current_reading_file.discard()
+    else:
+      assert self.current_reading_file.wh.closed
+      self.current_reading_file.discard()
+      for tmpfile in self.TMPFILE.file_spool:
+        tmpfile.close()
+        tmpfile.discard()
+    self.tmpdir_obj.__exit__(None,None,None)
 
 
 class CladeReprTracker(object):
