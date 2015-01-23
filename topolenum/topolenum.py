@@ -659,7 +659,7 @@ class FIFOfile(object):
                suffix='',max_file_size_GB=1.0,size_check_freq=100):
     self.tmpdir_obj = TemporaryDirectory(dir=top_path,prefix='FIFOworkspace_',
                                          suffix=suffix)
-    self.max_size = max_file_size_GB
+    self.max_size = max_file_size_GB*1024**3 #os.path.getsize() reports in bytes
     self.TMPFILE.init_class(mode,wbuffering,rbuffering,suffix,delete,
                             os.path.realpath(self.tmpdir_obj.__enter__()),
                             size_check_freq)

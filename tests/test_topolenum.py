@@ -138,7 +138,8 @@ class TestFIFOfileBaseClass(unittest.TestCase):
       self.assertSequenceEqual(fifo_obj.TMPFILE.file_spool,[],seq_type=list)
     
     # Start up FIFO and clear out calls to mocks
-    fifo_obj = te.FIFOfile(max_file_size_GB=1000.0,size_check_freq=2)
+    # 0.001*1024^3 ~= 1073.7, 500.0 < 1073.7 < 1100.0, perfect!
+    fifo_obj = te.FIFOfile(max_file_size_GB=0.000001,size_check_freq=2)
     fifo_obj.start_OUT_end()
     fifo_obj.start_IN_end()
     patched_NTF.reset_mock()
