@@ -1,4 +1,5 @@
 import unittest
+import os, os.path
 import cPickle as pickle
 from cStringIO import StringIO
 from mock import patch,call,mock_open,Mock,PropertyMock
@@ -317,6 +318,132 @@ class TestFIFOfileBaseClass(unittest.TestCase):
                                      call('FIFOfile003_')])
     fifo_obj.tmpdir_obj.__exit__.assert_called_once_with(None,None,None)
 
+
+class TestFIFOfile_and_TMPFILE_and_system_integration(unittest.TestCase):
+  
+  def setUp(self):
+    reload(te)
+    self.fifo = te.FIFOfile(top_path=None, # Let os decide where to put tempdir
+                            # 1.7695128917694092e-08 GB * 1024^4 B/GB = 19.0 B
+                            max_file_size_GB=1.7695128917694092e-08,
+                            size_check_delay=0) # Check file size every time
+    self.fifo.start_OUT_end()
+    self.fifo.start_IN_end()
+  
+  def test_rollover_and_file_discarding(self):
+    # After init there is one temp file and it is empty
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),1)
+    self.assertEqual(os.path.getsize(self.fifo.current_writing_file.name),0)
+    
+    # Pickling a single int increases file size by 5 bytes
+    # After pushing four ints the file size is 20, which is > max_size == 19,
+    # but prior to previous push file size was still < max_size, so wh has not
+    # yet rolled over to a new file
+    self.fifo.push(1);self.fifo.push(1);self.fifo.push(1);self.fifo.push(1)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),1)
+    self.assertEqual(os.path.getsize(self.fifo.current_writing_file.name),20)
+    
+    # When wh is retrieved for next push it will rollover to a new file
+    prev_writing_file_name = self.fifo.current_writing_file.name
+    self.fifo.push(1)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),2)
+    self.assertNotEqual(self.fifo.current_writing_file.name,
+                        prev_writing_file_name)
+    self.assertEqual(os.path.getsize(prev_writing_file_name),20)
+    self.assertEqual(os.path.getsize(self.fifo.current_writing_file.name),5)
+    
+    # The last of four pushes in a row should, again, cause a file rollover
+    two_ago_writing_file_name = prev_writing_file_name
+    prev_writing_file_name = self.fifo.current_writing_file.name
+    self.fifo.push(1);self.fifo.push(1);self.fifo.push(1);self.fifo.push(1)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),3)
+    self.assertNotEqual(self.fifo.current_writing_file.name,
+                        prev_writing_file_name)
+    self.assertNotEqual(self.fifo.current_writing_file.name,
+                        two_ago_writing_file_name)
+    self.assertEqual(os.path.getsize(two_ago_writing_file_name),20)
+    self.assertEqual(os.path.getsize(prev_writing_file_name),20)
+    self.assertEqual(os.path.getsize(self.fifo.current_writing_file.name),5)
+    
+    # Since nothing has been read from the FIFO, rh is still on the first file
+    # After four pops the rh cursor is at EOF of first file, but it has not yet
+    # detected this fact and the file has not yet been discarded
+    self.assertEqual(self.fifo.current_reading_file.name,
+                     two_ago_writing_file_name)
+    self.fifo.pop();self.fifo.pop();self.fifo.pop();self.fifo.pop()
+    self.assertEqual(self.fifo.current_reading_file.name,
+                     two_ago_writing_file_name)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),3)
+    
+    # After next pop rh rolls over to next file in the spool and the previous
+    # file is discarded (deleted from disk)
+    self.fifo.pop();
+    self.assertEqual(self.fifo.current_reading_file.name,
+                     prev_writing_file_name)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),2)
+    self.assertNotIn(two_ago_writing_file_name,
+                     os.listdir(self.fifo.tmpdir_obj.name))
+    
+    # The last of four more pops should cause another rollover and discarding
+    # of second file, leaving only the current writing file on disk
+    self.fifo.pop();self.fifo.pop();self.fifo.pop();self.fifo.pop()
+    self.assertEqual(self.fifo.current_reading_file.name,
+                     self.fifo.current_writing_file.name)
+    self.assertIs(self.fifo.current_reading_file,self.fifo.current_writing_file)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),1)
+    self.assertNotIn(prev_writing_file_name,
+                     os.listdir(self.fifo.tmpdir_obj.name))
+    self.assertSequenceEqual(os.listdir(self.fifo.tmpdir_obj.name),
+                             [os.path.basename(
+                                        self.fifo.current_writing_file.name)])
+  
+  def test_catching_up_to_wh_with_rollovers(self):
+    # After four pushes and four pops rh cursor has caught up to wh, which has
+    # not yet rolled over to a new file
+    self.fifo.push(1);self.fifo.push(2);self.fifo.push(3);self.fifo.push(4)
+    self.assertSequenceEqual([self.fifo.pop() for i in xrange(4)],[1,2,3,4])
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),1)
+    
+    # Without further writing, subsequent pops return None, still only one file
+    self.assertSequenceEqual([self.fifo.pop() for i in xrange(4)],[None,None,
+                                                                   None,None])
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),1)
+    
+    # After six more pushes the wh has rolled over twice, but rh is sill on
+    # the first file
+    self.fifo.push(5);self.fifo.push(6);self.fifo.push(7)
+    self.fifo.push(8);self.fifo.push(9);self.fifo.push(10)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),3)
+    
+    # After six pops rh catches up to wh again, across two files
+    self.assertSequenceEqual([self.fifo.pop() for i in xrange(6)],[5,6,7,8,9,
+                                                                           10])
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),1)
+    self.assertIs(self.fifo.current_reading_file,self.fifo.current_writing_file)
+    
+    # Further pops again return Nones
+    self.assertSequenceEqual([self.fifo.pop() for i in xrange(4)],[None,None,
+                                                                   None,None])
+  
+  def test_cleanup(self):
+    # After pushing ten integers there are three temp files
+    for i in xrange(10):
+      self.fifo.push(i+1)
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),3)
+    
+    # After five pops there are two temp files remaining
+    self.assertSequenceEqual([self.fifo.pop() for i in xrange(5)],[1,2,3,4,5])
+    self.assertEqual(len(os.listdir(self.fifo.tmpdir_obj.name)),2)
+    
+    # After closing FIFO remaining files and the temp dir are gone from disk
+    self.fifo.close()
+    self.assertFalse(os.path.exists(self.fifo.current_writing_file.name))
+    self.assertFalse(os.path.exists(self.fifo.current_reading_file.name))
+    self.assertFalse(os.path.exists(self.fifo.tmpdir_obj.name))
+  
+  def tearDown(self):
+    self.fifo.close()
+    
 
 if __name__ == "__main__":
   #import sys;sys.argv = ['', 'Test.testName']
