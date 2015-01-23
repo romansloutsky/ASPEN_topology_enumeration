@@ -599,14 +599,14 @@ class FIFOfile(object):
       return object.__new__(cls,*args,**kwargs)
     
     @classmethod
-    def init_class(cls,mode,wbuf,rbuf,suffix,delete,dir,check_freq):
+    def init_class(cls,mode,wbuf,rbuf,suffix,delete,dir,check_delay):
       cls.mode = mode
       cls.wbuf = wbuf
       cls.rbuf = rbuf
       cls.suffix = suffix
       cls.delete = delete
       cls.dir = dir
-      cls.check_freq = check_freq
+      cls.check_delay = check_delay
       cls.instcount = 0
     
     @classmethod
@@ -637,7 +637,7 @@ class FIFOfile(object):
     
     @property
     def size(self):
-      if self.access_count_since_size_check >= self.check_freq:
+      if self.access_count_since_size_check >= self.check_delay:
         self._size = os.path.getsize(self.name)
         self.access_count_since_size_check = 0
       else:
@@ -656,13 +656,13 @@ class FIFOfile(object):
     
   
   def __init__(self,mode='b',wbuffering=0,rbuffering=0,delete=True,top_path='.',
-               suffix='',max_file_size_GB=1.0,size_check_freq=100):
+               suffix='',max_file_size_GB=1.0,size_check_delay=100):
     self.tmpdir_obj = TemporaryDirectory(dir=top_path,prefix='FIFOworkspace_',
                                          suffix=suffix)
     self.max_size = max_file_size_GB*1024**3 #os.path.getsize() reports in bytes
     self.TMPFILE.init_class(mode,wbuffering,rbuffering,suffix,delete,
                             os.path.realpath(self.tmpdir_obj.__enter__()),
-                            size_check_freq)
+                            size_check_delay)
     
   def start_OUT_end(self):
     self.current_reading_file = self.TMPFILE()

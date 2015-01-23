@@ -12,7 +12,7 @@ class TestFIFOfileBaseClassTMPFILEclass(unittest.TestCase):
     reload(te)
     self.TMPFILE = te.FIFOfile.TMPFILE
     self.TMPFILE.init_class(mode='b',wbuf=0,rbuf=0,suffix='',delete=True,
-                            dir='/dummy/path',check_freq=5)
+                            dir='/dummy/path',check_delay=5)
   
   def test_instance_counting_and_file_creation_and_naming(self,patched_NTF):
     
@@ -139,7 +139,7 @@ class TestFIFOfileBaseClass(unittest.TestCase):
     
     # Start up FIFO and clear out calls to mocks
     # 0.001*1024^3 ~= 1073.7, 500.0 < 1073.7 < 1100.0, perfect!
-    fifo_obj = te.FIFOfile(max_file_size_GB=0.000001,size_check_freq=2)
+    fifo_obj = te.FIFOfile(max_file_size_GB=0.000001,size_check_delay=2)
     fifo_obj.start_OUT_end()
     fifo_obj.start_IN_end()
     patched_NTF.reset_mock()
