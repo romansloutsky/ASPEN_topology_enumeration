@@ -443,7 +443,30 @@ class TestFIFOfile_and_TMPFILE_and_system_integration(unittest.TestCase):
   
   def tearDown(self):
     self.fifo.close()
-    
+
+
+class TestSharedFIFOfileClassTMPFILEClass(unittest.TestCase):
+   
+  def setUp(self):
+    reload(te)
+    self.TMPFILE = te.SharedFIFOfile.TMPFILE
+    self.TMPFILE.init_class(mode='b',wbuf=0,rbuf=0,suffix='',delete=True,
+                            dir='/dummy/path',check_delay=0)
+   
+  @patch('os.path.getsize',return_value=0)
+  def test_spool_call_and_writing_side_init(self,patched_getsize):
+    self.TMPFILE.send_conn.send('dummy_tempfile_name')
+    tempfile_obj = self.TMPFILE.spool()
+    self.assertIs(self.TMPFILE.send_conn.recv(),None)
+    patched_getsize.assert_called_once_with('dummy_tempfile_name')
+    self.assertEqual(tempfile_obj.name,'dummy_tempfile_name')
+    self.assertIs(tempfile_obj._size,patched_getsize.return_value)
+    self.assertEqual(tempfile_obj.access_count_since_size_check,0)
+  
+  @patch('topolenum.topolenum.FIFOfile.TMPFILE.__init__')
+  def test_reading_side_init(self,patched_TMPFILE_init):
+    tempfile_obj = self.TMPFILE()
+    patched_TMPFILE_init.assert_called_once_with(tempfile_obj)
 
 if __name__ == "__main__":
   #import sys;sys.argv = ['', 'Test.testName']

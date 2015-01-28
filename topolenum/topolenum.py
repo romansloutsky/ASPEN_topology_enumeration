@@ -867,6 +867,26 @@ class AssemblyWorkspace(object):
 
 
 class SharedFIFOfile(FIFOfile):
+  class TMPFILE(FIFOfile.TMPFILE):
+    @classmethod
+    def init_class(cls,*args,**kwargs):
+      super(SharedFIFOfile.TMPFILE,cls).init_class(*args,**kwargs)
+      cls.request_conn,cls.send_conn = multiprocessing.Pipe()
+    
+    @classmethod
+    def spool(cls):
+      cls.request_conn.send(None)
+      return cls(cls.request_conn.recv())
+    
+    def __init__(self,filename=None):
+      if filename is None:
+        FIFOfile.TMPFILE.__init__(self)
+      else:
+        self.name = filename
+        self._size = os.path.getsize(filename)
+        self.access_count_since_size_check = 0
+  
+  
   def __init__(self,*args,**kwargs):
     FIFOfile.__init__(self,*args,**kwargs)
     
