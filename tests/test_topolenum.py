@@ -468,6 +468,41 @@ class TestSharedFIFOfileClassTMPFILEClass(unittest.TestCase):
     tempfile_obj = self.TMPFILE()
     patched_TMPFILE_init.assert_called_once_with(tempfile_obj)
 
+
+class TestSharedFIFOfileClassSpoolerThreadClass(unittest.TestCase):
+  
+  def setUp(self):
+    reload(te)
+    self.writing_end_conn,self.reading_end_conn = te.multiprocessing.Pipe()
+    self.mock_spool_callable = Mock()
+    self.tmpfile_name_mock_property = \
+                              PropertyMock(return_value='dummy_tempfile_name')
+    type(self.mock_spool_callable.return_value).name = \
+                                                self.tmpfile_name_mock_property
+    self.spooler = te.SharedFIFOfile.SpoolerThread(self.reading_end_conn,
+                                                   self.mock_spool_callable,
+                                                   interval_len=0.01)
+  
+  def test_SpoolerThread(self):
+    self.assertEqual(self.spooler.name,'MainProcess--TmpfileSpoolerThread')
+    self.assertEqual(len(te.threading.enumerate()),1)
+    self.spooler.start()
+    self.assertEqual(len(te.threading.enumerate()),2)
+    self.assertFalse(self.writing_end_conn.poll())
+    self.assertFalse(self.mock_spool_callable.called)
+    self.assertFalse(self.tmpfile_name_mock_property.called)
+    self.writing_end_conn.send(None)
+    import time
+    time.sleep(0.1) # Things won't happen in the other thread instantaneously
+    self.mock_spool_callable.assert_called_once_with()
+    self.tmpfile_name_mock_property.assert_called_once_with()
+    self.assertTrue(self.writing_end_conn.poll())
+    self.assertEqual(self.writing_end_conn.recv(),'dummy_tempfile_name')
+  
+  def tearDown(self):
+    self.spooler.stop.set()
+
+
 if __name__ == "__main__":
   #import sys;sys.argv = ['', 'Test.testName']
   unittest.main()

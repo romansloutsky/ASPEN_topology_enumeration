@@ -5,6 +5,7 @@ import itertools
 import tempfile
 import weakref
 import multiprocessing
+import threading
 import Queue
 import gc
 import cPickle as pickle
@@ -885,6 +886,23 @@ class SharedFIFOfile(FIFOfile):
         self.name = filename
         self._size = os.path.getsize(filename)
         self.access_count_since_size_check = 0
+  
+  
+  class SpoolerThread(threading.Thread):
+    def __init__(self,connection,spool_callable,interval_len=1):
+      proc_name = multiprocessing.current_process().name
+      threading.Thread.__init__(self,name='--'.join([proc_name,
+                                                     'TmpfileSpoolerThread']))
+      self.stop = threading.Event()
+      self.connection = connection
+      self.spool = spool_callable
+      self.interval_len = interval_len
+    
+    def run(self):
+      while not self.stop.is_set():
+        if self.connection.poll(self.interval_len):
+          assert self.connection.recv() is None
+          self.connection.send(self.spool().name)
   
   
   def __init__(self,*args,**kwargs):
