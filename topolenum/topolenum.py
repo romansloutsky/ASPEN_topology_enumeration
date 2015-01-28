@@ -867,8 +867,8 @@ class AssemblyWorkspace(object):
 
 
 class SharedFIFOfile(FIFOfile):
-  def __init__(self,name='use_tempfile',mode='b',wbuffering=0,rbuffering=0,delete=True):
-    self.init_args = (name,mode,wbuffering,rbuffering,delete,False)
+  def __init__(self,*args,**kwargs):
+    FIFOfile.__init__(self,*args,**kwargs)
     
     self.lock = multiprocessing.Lock()
     self.acquire = self.lock.acquire
