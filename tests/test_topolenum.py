@@ -552,6 +552,30 @@ class TestSharedFIFOfileClass(unittest.TestCase):
     self.assertTrue(hasattr(self.fifo_obj,'spooler'))
     self.assertTrue(self.fifo_obj.spooler.is_alive())
   
+  @patch('os.path.getsize',return_value=100)
+  def test_starting_fifo_IN_end(self,patched_getsize,*args):
+    self.fifo_obj = te.SharedFIFOfile(interval_len=0.01)
+    self.assertFalse(hasattr(self.fifo_obj,'side'))
+    self.assertFalse(hasattr(self.fifo_obj,'current_reading_file'))
+    self.assertFalse(hasattr(self.fifo_obj,'current_writing_file'))
+    
+    te.SharedFIFOfile.TMPFILE.send_conn.send('dummy_temp_file')
+    with patch('__builtin__.open',mock_open(),create=True) as patched_open:
+      self.fifo_obj.start_IN_end()
+    
+    self.assertTrue(hasattr(self.fifo_obj,'side'))
+    self.assertEqual(self.fifo_obj.side,'writing')
+    
+    self.assertFalse(hasattr(self.fifo_obj,'current_reading_file'))
+    self.assertTrue(hasattr(self.fifo_obj,'current_writing_file'))
+    self.assertEqual(self.fifo_obj.current_writing_file.name,'dummy_temp_file')
+    patched_getsize.assert_called_once_with('dummy_temp_file')
+    self.fifo_obj.current_writing_file._size == 100
+    
+    patched_open.assert_called_once_with('dummy_temp_file','wb',0)
+    self.assertIs(self.fifo_obj.current_writing_file.wh,
+                  patched_open.return_value)
+  
   def tearDown(self):
     if hasattr(self,'fifo_obj'):
       if hasattr(self.fifo_obj,'spooler'):

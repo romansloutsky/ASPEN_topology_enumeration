@@ -932,10 +932,9 @@ class SharedFIFOfile(FIFOfile):
     self.spooler.start()
   
   def start_IN_end(self):
-    if self.init_args[0] == 'use_tempfile':
-      self.send_filename.send(self.name)
-      self.send_filename.close()
-  
+    self.side = 'writing'
+    self.current_writing_file = self.TMPFILE(self.TMPFILE.request_conn.recv())
+    self.current_writing_file.open()
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:
