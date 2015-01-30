@@ -495,6 +495,34 @@ class TestSharedFIFOfileClassSpoolerThreadClass(unittest.TestCase):
   
   def tearDown(self):
     self.spooler.stop.set()
+@patch('os.path.realpath',return_value='/dummy/path')
+@patch('topolenum.topolenum.TemporaryDirectory')
+@patch('tempfile.NamedTemporaryFile',**{'return_value.name':'dummy_temp_file'})
+class TestSharedFIFOfileClass(unittest.TestCase):
+  
+  def setUp(self):
+    reload(te)
+  
+  def test_TMPFILE_class_init_w_conns(self,*args):
+    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'instcount'))
+    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'))
+    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'))
+    
+    fifo_obj = te.SharedFIFOfile()
+    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'instcount'))
+    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'))
+    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'))
+    
+    te.SharedFIFOfile.TMPFILE.request_conn.send('test_packet1')
+    self.assertEqual(te.SharedFIFOfile.TMPFILE.send_conn.recv(),'test_packet1')
+    te.SharedFIFOfile.TMPFILE.send_conn.send('test_packet2')
+    self.assertEqual(te.SharedFIFOfile.TMPFILE.request_conn.recv(),'test_packet2')
+  
+  def tearDown(self):
+    if hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'):
+      te.SharedFIFOfile.TMPFILE.request_conn.close()
+    if hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'):
+      te.SharedFIFOfile.TMPFILE.send_conn.close()
 
 
 if __name__ == "__main__":
