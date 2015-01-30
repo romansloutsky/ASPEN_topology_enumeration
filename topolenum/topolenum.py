@@ -1094,7 +1094,6 @@ class AssemblerProcess(multiprocessing.Process):
     self.min_score = shared_min_score
     self.encountered_assemblies_dict = shared_encountered_assemblies_dict
     self.score_submission_queue = score_submission_queue
-    self.fifo = SharedFIFOfile()
     self.pass_to_workspace = pass_to_workspace
     self.seed_assembly = seed_assembly
     
@@ -1103,6 +1102,7 @@ class AssemblerProcess(multiprocessing.Process):
     self.results_fifo = results_fifo
   
   def run(self):
+    self.fifo = SharedFIFOfile(suffix='--'+self.name)
     self.pass_to_workspace.kwargs['seed_assembly'] = self.seed_assembly
     self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
                                                   self.encountered_assemblies_dict,
