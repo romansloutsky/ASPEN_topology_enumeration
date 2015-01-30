@@ -94,8 +94,7 @@ class TestFIFOfileBaseClass(unittest.TestCase):
     patched_TMPFILE_initcls.assert_called_once_with('b',0,0,'dummy_suffix',True,
                                                     '/dummy/path',100)
   
-  def test_starting_fifo_OUT_end(self,patched_NTF,patched_TmpDir,
-                                 patched_realpath,patched_exists):
+  def test_starting_fifo_OUT_end(self,patched_NTF,*args):
     fifo_obj = te.FIFOfile()
     self.assertFalse(hasattr(te.FIFOfile.TMPFILE,'file_spool'))
     patched_NTF.assert_not_called()
@@ -107,8 +106,7 @@ class TestFIFOfileBaseClass(unittest.TestCase):
     self.assertSequenceEqual(te.FIFOfile.TMPFILE.file_spool,[],seq_type=list)
     self.assertEqual(fifo_obj.current_reading_file.name,'dummy_temp_file')
   
-  def test_starting_fifo_IN_end(self,patched_NTF,patched_TmpDir,
-                                patched_realpath,patched_exists):
+  def test_starting_fifo_IN_end(self,*args):
     fifo_obj = te.FIFOfile()
     self.assertFalse(hasattr(fifo_obj,'current_writing_file'))
     
@@ -122,8 +120,7 @@ class TestFIFOfileBaseClass(unittest.TestCase):
   @patch('os.path.getsize',side_effect=[500.0,1100.0])
   @patch('__builtin__.open')
   def test_wh_retrieval_and_rollover(self,patched_open,patched_getsize,
-                                     patched_NTF,patched_TmpDir,
-                                     patched_realpath,patched_exists):
+                                     patched_NTF,*args):
     def patched_NTF_side_effect(*args,**kwargs):
       return_val = Mock()
       return_val.name = kwargs['prefix']
@@ -182,10 +179,7 @@ class TestFIFOfileBaseClass(unittest.TestCase):
     self.assertEqual(fifo_obj.current_writing_file._size,0.0)
     self.assertEqual(fifo_obj.current_reading_file._size,1100.0)
   
-  def test_rh_retrival_EOF_testing_and_discarding(self,patched_NTF,
-                                                  patched_TmpDir,
-                                                  patched_realpath,
-                                                  patched_exists):
+  def test_rh_retrival_EOF_testing_and_discarding(self,patched_NTF,*args):
     patched_NTF.instances = []
     def patched_NTF_side_effect(*args,**kwargs):
       return_val = Mock(**{'tell.side_effect':[123,124,200,200,200]})
