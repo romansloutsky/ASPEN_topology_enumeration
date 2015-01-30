@@ -906,6 +906,10 @@ class SharedFIFOfile(FIFOfile):
   
   
   def __init__(self,*args,**kwargs):
+    if 'interval_len' in kwargs:
+      self.spooler_polling_interval_len = kwargs.pop('interval_len')
+    else:
+      self.spooler_polling_interval_len = 1
     FIFOfile.__init__(self,*args,**kwargs)
     
     self.lock = multiprocessing.Lock()
