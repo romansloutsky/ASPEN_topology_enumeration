@@ -921,25 +921,21 @@ class SharedFIFOfile(FIFOfile):
     self.is_set = self.event.is_set
     self.clear = self.event.clear
     self.wait = self.event.wait
-    
-    self.read_handle_closed = multiprocessing.Event()
-    
-    if name == 'use_tempfile':
-      self.get_filename,self.send_filename = multiprocessing.Pipe(duplex=False)
+  
+  def start_OUT_end(self):
+    self.side = 'reading'
+    FIFOfile.start_OUT_end(self)
+    self.TMPFILE.send_conn.send(self.current_reading_file.name)
+    self.spooler = self.SpoolerThread(self.TMPFILE.send_conn,
+                                      super(self.TMPFILE,self.TMPFILE).spool,
+                                      self.spooler_polling_interval_len)
+    self.spooler.start()
   
   def start_IN_end(self):
-    FIFOfile.__init__(self,*self.init_args)
     if self.init_args[0] == 'use_tempfile':
       self.send_filename.send(self.name)
       self.send_filename.close()
   
-  def start_OUT_end(self):
-    if self.init_args[0] == 'use_tempfile':
-      self.name = self.get_filename.recv()
-      self.get_filename.close()
-    mode = self.init_args[1]
-    rbuffering = self.init_args[3]
-    self._rh = open(self.name,'r'+mode,rbuffering)
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:

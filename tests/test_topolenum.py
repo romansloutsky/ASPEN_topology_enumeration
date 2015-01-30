@@ -495,6 +495,9 @@ class TestSharedFIFOfileClassSpoolerThreadClass(unittest.TestCase):
   
   def tearDown(self):
     self.spooler.stop.set()
+    self.spooler.join()
+
+
 @patch('os.path.realpath',return_value='/dummy/path')
 @patch('topolenum.topolenum.TemporaryDirectory')
 @patch('tempfile.NamedTemporaryFile',**{'return_value.name':'dummy_temp_file'})
@@ -518,7 +521,44 @@ class TestSharedFIFOfileClass(unittest.TestCase):
     te.SharedFIFOfile.TMPFILE.send_conn.send('test_packet2')
     self.assertEqual(te.SharedFIFOfile.TMPFILE.request_conn.recv(),'test_packet2')
   
+  def test_starting_fifo_OUT_end(self,patched_NTF,*args):
+    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'file_spool'))
+    self.assertEqual(len(te.threading.enumerate()),1)
+    
+    self.fifo_obj = te.SharedFIFOfile(interval_len=0.01)
+    self.assertFalse(hasattr(self.fifo_obj,'side'))
+    self.assertFalse(hasattr(self.fifo_obj,'current_reading_file'))
+    self.assertFalse(hasattr(self.fifo_obj,'current_writing_file'))
+    self.assertFalse(hasattr(self.fifo_obj,'spooler'))
+    self.assertFalse(patched_NTF.called)
+    
+    self.fifo_obj.start_OUT_end()
+    self.assertTrue(hasattr(self.fifo_obj,'side'))
+    self.assertEqual(self.fifo_obj.side,'reading')
+    
+    self.assertEqual(patched_NTF.call_count,1)
+    self.assertTrue(hasattr(self.fifo_obj,'current_reading_file'))
+    self.assertFalse(hasattr(self.fifo_obj,'current_writing_file'))
+    self.assertIs(self.fifo_obj.current_reading_file.rh,
+                  patched_NTF.return_value)
+    self.assertIs(self.fifo_obj.current_reading_file.rh.name,'dummy_temp_file')
+    
+    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'file_spool'))
+    self.assertSequenceEqual(te.SharedFIFOfile.TMPFILE.file_spool,[])
+    
+    self.assertTrue(te.SharedFIFOfile.TMPFILE.request_conn.poll())
+    self.assertEqual(te.SharedFIFOfile.TMPFILE.request_conn.recv(),'dummy_temp_file')
+    self.assertEqual(len(te.threading.enumerate()),2)
+    self.assertTrue(hasattr(self.fifo_obj,'spooler'))
+    self.assertTrue(self.fifo_obj.spooler.is_alive())
+  
   def tearDown(self):
+    if hasattr(self,'fifo_obj'):
+      if hasattr(self.fifo_obj,'spooler'):
+        if self.fifo_obj.spooler.is_alive():
+          self.fifo_obj.spooler.stop.set()
+          self.fifo_obj.spooler.join()
+    
     if hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'):
       te.SharedFIFOfile.TMPFILE.request_conn.close()
     if hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'):
