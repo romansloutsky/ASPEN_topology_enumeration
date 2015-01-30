@@ -449,9 +449,9 @@ class TestSharedFIFOfileClassTMPFILEClass(unittest.TestCase):
    
   @patch('os.path.getsize',return_value=0)
   def test_spool_call_and_writing_side_init(self,patched_getsize):
-    self.TMPFILE.send_conn.send('dummy_tempfile_name')
+    self.TMPFILE.reading_side_conn.send('dummy_tempfile_name')
     tempfile_obj = self.TMPFILE.spool()
-    self.assertIs(self.TMPFILE.send_conn.recv(),None)
+    self.assertIs(self.TMPFILE.reading_side_conn.recv(),None)
     patched_getsize.assert_called_once_with('dummy_tempfile_name')
     self.assertEqual(tempfile_obj.name,'dummy_tempfile_name')
     self.assertIs(tempfile_obj._size,patched_getsize.return_value)
@@ -508,18 +508,18 @@ class TestSharedFIFOfileClass(unittest.TestCase):
   
   def test_TMPFILE_class_init_w_conns(self,*args):
     self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'instcount'))
-    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'))
-    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'))
+    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'writing_side_conn'))
+    self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'reading_side_conn'))
     
     fifo_obj = te.SharedFIFOfile()
     self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'instcount'))
-    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'))
-    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'))
+    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'writing_side_conn'))
+    self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'reading_side_conn'))
     
-    te.SharedFIFOfile.TMPFILE.request_conn.send('test_packet1')
-    self.assertEqual(te.SharedFIFOfile.TMPFILE.send_conn.recv(),'test_packet1')
-    te.SharedFIFOfile.TMPFILE.send_conn.send('test_packet2')
-    self.assertEqual(te.SharedFIFOfile.TMPFILE.request_conn.recv(),'test_packet2')
+    te.SharedFIFOfile.TMPFILE.writing_side_conn.send('test_packet1')
+    self.assertEqual(te.SharedFIFOfile.TMPFILE.reading_side_conn.recv(),'test_packet1')
+    te.SharedFIFOfile.TMPFILE.reading_side_conn.send('test_packet2')
+    self.assertEqual(te.SharedFIFOfile.TMPFILE.writing_side_conn.recv(),'test_packet2')
   
   def test_starting_fifo_OUT_end(self,patched_NTF,*args):
     self.assertFalse(hasattr(te.SharedFIFOfile.TMPFILE,'file_spool'))
@@ -546,8 +546,8 @@ class TestSharedFIFOfileClass(unittest.TestCase):
     self.assertTrue(hasattr(te.SharedFIFOfile.TMPFILE,'file_spool'))
     self.assertSequenceEqual(te.SharedFIFOfile.TMPFILE.file_spool,[])
     
-    self.assertTrue(te.SharedFIFOfile.TMPFILE.request_conn.poll())
-    self.assertEqual(te.SharedFIFOfile.TMPFILE.request_conn.recv(),'dummy_temp_file')
+    self.assertTrue(te.SharedFIFOfile.TMPFILE.writing_side_conn.poll())
+    self.assertEqual(te.SharedFIFOfile.TMPFILE.writing_side_conn.recv(),'dummy_temp_file')
     self.assertEqual(len(te.threading.enumerate()),2)
     self.assertTrue(hasattr(self.fifo_obj,'spooler'))
     self.assertTrue(self.fifo_obj.spooler.is_alive())
@@ -559,7 +559,7 @@ class TestSharedFIFOfileClass(unittest.TestCase):
     self.assertFalse(hasattr(self.fifo_obj,'current_reading_file'))
     self.assertFalse(hasattr(self.fifo_obj,'current_writing_file'))
     
-    te.SharedFIFOfile.TMPFILE.send_conn.send('dummy_temp_file')
+    te.SharedFIFOfile.TMPFILE.reading_side_conn.send('dummy_temp_file')
     with patch('__builtin__.open',mock_open(),create=True) as patched_open:
       self.fifo_obj.start_IN_end()
     
@@ -582,11 +582,11 @@ class TestSharedFIFOfileClass(unittest.TestCase):
         if self.fifo_obj.spooler.is_alive():
           self.fifo_obj.spooler.stop.set()
           self.fifo_obj.spooler.join()
-    
-    if hasattr(te.SharedFIFOfile.TMPFILE,'request_conn'):
-      te.SharedFIFOfile.TMPFILE.request_conn.close()
-    if hasattr(te.SharedFIFOfile.TMPFILE,'send_conn'):
-      te.SharedFIFOfile.TMPFILE.send_conn.close()
+     
+    if hasattr(te.SharedFIFOfile.TMPFILE,'writing_side_conn'):
+      te.SharedFIFOfile.TMPFILE.writing_side_conn.close()
+    if hasattr(te.SharedFIFOfile.TMPFILE,'reading_side_conn'):
+      te.SharedFIFOfile.TMPFILE.reading_side_conn.close()
 
 
 if __name__ == "__main__":

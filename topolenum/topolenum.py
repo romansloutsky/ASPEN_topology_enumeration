@@ -872,12 +872,12 @@ class SharedFIFOfile(FIFOfile):
     @classmethod
     def init_class(cls,*args,**kwargs):
       super(SharedFIFOfile.TMPFILE,cls).init_class(*args,**kwargs)
-      cls.request_conn,cls.send_conn = multiprocessing.Pipe()
+      cls.writing_side_conn,cls.reading_side_conn = multiprocessing.Pipe()
     
     @classmethod
     def spool(cls):
-      cls.request_conn.send(None)
-      return cls(cls.request_conn.recv())
+      cls.writing_side_conn.send(None)
+      return cls(cls.writing_side_conn.recv())
     
     def __init__(self,filename=None):
       if filename is None:
@@ -925,15 +925,15 @@ class SharedFIFOfile(FIFOfile):
   def start_OUT_end(self):
     self.side = 'reading'
     FIFOfile.start_OUT_end(self)
-    self.TMPFILE.send_conn.send(self.current_reading_file.name)
-    self.spooler = self.SpoolerThread(self.TMPFILE.send_conn,
+    self.TMPFILE.reading_side_conn.send(self.current_reading_file.name)
+    self.spooler = self.SpoolerThread(self.TMPFILE.reading_side_conn,
                                       super(self.TMPFILE,self.TMPFILE).spool,
                                       self.spooler_polling_interval_len)
     self.spooler.start()
   
   def start_IN_end(self):
     self.side = 'writing'
-    self.current_writing_file = self.TMPFILE(self.TMPFILE.request_conn.recv())
+    self.current_writing_file = self.TMPFILE(self.TMPFILE.writing_side_conn.recv())
     self.current_writing_file.open()
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
