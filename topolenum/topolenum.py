@@ -1137,12 +1137,13 @@ class AssemblerProcess(multiprocessing.Process):
           else:
             continue
       self.fifo.push('SHUTDOWN')
+      self.fifo.close()
       self.queue_loader_p.join(timeout=15)
     except:
+      self.fifo.current_writing_file.wh.close()
+      self.fifo.tmpdir_obj.__exit__(None,None,None)
       self.queue_loader_p.terminate()
       raise
-    finally:
-      self.fifo.close()
     self.results_fifo.start_IN_end()
     self.results_fifo.push_all(self.assemblies.accepted_assemblies)
     self.results_fifo.push('SHUTDOWN')
