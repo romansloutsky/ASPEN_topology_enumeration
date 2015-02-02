@@ -2,6 +2,7 @@ import unittest
 import os, os.path
 import cPickle as pickle
 from cStringIO import StringIO
+from multiprocessing import Pipe
 from mock import patch,call,mock_open,Mock,PropertyMock
 from topolenum import topolenum as te
 
@@ -498,6 +499,7 @@ class TestSharedFIFOfileClassSpoolerThreadClass(unittest.TestCase):
     self.spooler.join()
 
 
+@patch('os.path.exists',return_value=False)
 @patch('os.path.realpath',return_value='/dummy/path')
 @patch('topolenum.topolenum.TemporaryDirectory')
 @patch('tempfile.NamedTemporaryFile',**{'return_value.name':'dummy_temp_file'})
@@ -576,13 +578,137 @@ class TestSharedFIFOfileClass(unittest.TestCase):
     self.assertIs(self.fifo_obj.current_writing_file.wh,
                   patched_open.return_value)
   
+  @patch('os.path.getsize',side_effect=[0,1100.0]*2)
+  @patch('multiprocessing.Pipe')
+  @patch('__builtin__.open')
+  def test_wh_rollover_writing_end(self,patched_open,patched_Pipe,
+                                   patched_getsize,patched_NTF,*args):
+    def patched_Pipe_side_effect():
+      writing_side_conn,reading_side_conn = Pipe()
+      patched_Pipe.wrsconn = Mock(wraps=writing_side_conn)
+      patched_Pipe.rdsconn = Mock(wraps=reading_side_conn)
+      return patched_Pipe.wrsconn,patched_Pipe.rdsconn
+    patched_Pipe.side_effect = patched_Pipe_side_effect
+    
+    def patched_NTF_side_effect(*args,**kwargs):
+      return_val = Mock()
+      return_val.name = kwargs['prefix']
+      return return_val
+    patched_NTF.side_effect = patched_NTF_side_effect
+    
+    class TesterProc(te.multiprocessing.Process):
+      def __init__(self,fifo_obj,shutdown):
+        te.multiprocessing.Process.__init__(self)
+        self.fifo_obj = fifo_obj
+        self.shutdown = shutdown
+      
+      def run(self):
+        self.fifo_obj.start_OUT_end()
+        while not self.shutdown.wait(0.01):
+          pass
+        self.fifo_obj.close()
+    
+    self.fifo_obj = te.SharedFIFOfile(max_file_size_GB=0.000001,
+                                      size_check_delay=1,interval_len=0.01)
+    self.shutdown_EV = te.multiprocessing.Event()
+    self.other_proc = TesterProc(self.fifo_obj,self.shutdown_EV)
+    self.other_proc.start()
+    self.fifo_obj.start_IN_end()
+    patched_Pipe.wrsconn.recv.reset_mock()
+    patched_open.reset_mock()
+    patched_getsize.reset_mock()
+    
+    self.fifo_obj.wh
+    self.assertFalse(patched_getsize.called)
+    self.assertFalse(patched_Pipe.wrsconn.send.called)
+    self.assertFalse(patched_Pipe.wrsconn.recv.called)
+    self.assertFalse(patched_open.return_value.close.called)
+    self.assertFalse(patched_open.called)
+    self.fifo_obj.wh
+    patched_getsize.assert_has_calls([call('FIFOfile001_'),
+                                      call('FIFOfile002_')])
+    patched_Pipe.wrsconn.send.assert_called_once_with(None)
+    patched_Pipe.wrsconn.recv.assert_called_once_with()
+    patched_open.return_value.close.assert_called_once_with()
+    patched_open.assert_called_once_with('FIFOfile002_','wb',0)
+    
+    self.shutdown_EV.set()
+    self.fifo_obj.close()
+    self.other_proc.join()
+  
+  @patch('os.path.getsize',side_effect=[0,1100.0]*2)
+  @patch('multiprocessing.Pipe')
+  @patch('__builtin__.open')
+  def test_wh_rollover_reading_end(self,patched_open,patched_Pipe,
+                                   patched_getsize,patched_NTF,*args):
+    def patched_Pipe_side_effect():
+      writing_side_conn,reading_side_conn = Pipe()
+      patched_Pipe.wrsconn = Mock(wraps=writing_side_conn)
+      patched_Pipe.rdsconn = Mock(wraps=reading_side_conn)
+      return patched_Pipe.wrsconn,patched_Pipe.rdsconn
+    patched_Pipe.side_effect = patched_Pipe_side_effect
+    
+    def patched_NTF_side_effect(*args,**kwargs):
+      return_val = Mock()
+      return_val.name = kwargs['prefix']
+      return return_val
+    patched_NTF.side_effect = patched_NTF_side_effect
+    
+    class TesterProc(te.multiprocessing.Process):
+      def __init__(self,fifo_obj,ask_for_file_EV,shutdown):
+        te.multiprocessing.Process.__init__(self)
+        self.fifo_obj = fifo_obj
+        self.ask_for_file = ask_for_file_EV
+        self.shutdown = shutdown
+      
+      def run(self):
+        self.fifo_obj.start_IN_end()
+        while not self.ask_for_file.wait(0.01):
+          pass
+        self.fifo_obj.wh
+        while not self.shutdown.wait(0.01):
+          pass
+        self.fifo_obj.close()
+    
+    self.fifo_obj = te.SharedFIFOfile(max_file_size_GB=0.000001,
+                                      size_check_delay=0,interval_len=0.01)
+    self.shutdown_EV = te.multiprocessing.Event()
+    ask_for_file_EV = te.multiprocessing.Event()
+    self.other_proc = TesterProc(self.fifo_obj,ask_for_file_EV,self.shutdown_EV)
+    self.other_proc.start()
+    self.fifo_obj.start_OUT_end()
+    patched_NTF.reset_mock()
+    patched_Pipe.rdsconn.reset_mock()
+    
+    self.assertFalse(patched_Pipe.rdsconn.recv.called)
+    self.assertFalse(patched_Pipe.rdsconn.send.called)
+    self.assertFalse(patched_NTF.called)
+    ask_for_file_EV.set()
+    
+    self.shutdown_EV.set()
+    self.fifo_obj.close()
+    self.assertTrue(patched_NTF.called)
+    patched_Pipe.rdsconn.recv.assert_called_once_with()
+    patched_Pipe.rdsconn.send.assert_called_once_with('FIFOfile002_')
+    self.other_proc.join()
+  
   def tearDown(self):
     if hasattr(self,'fifo_obj'):
       if hasattr(self.fifo_obj,'spooler'):
         if self.fifo_obj.spooler.is_alive():
           self.fifo_obj.spooler.stop.set()
           self.fifo_obj.spooler.join()
-     
+    
+    if hasattr(self,'shutdown_EV'):
+      if not self.shutdown_EV.is_set():
+        self.shutdown_EV.set()
+    
+    if hasattr(self,'other_proc'):
+      if self.other_proc.is_alive():
+        self.other_proc.join(timeout=0.1)
+        if self.other_proc.is_alive():
+          self.other_proc.terminate()
+    
     if hasattr(te.SharedFIFOfile.TMPFILE,'writing_side_conn'):
       te.SharedFIFOfile.TMPFILE.writing_side_conn.close()
     if hasattr(te.SharedFIFOfile.TMPFILE,'reading_side_conn'):
