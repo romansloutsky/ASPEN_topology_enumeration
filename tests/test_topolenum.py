@@ -2,7 +2,7 @@ import unittest
 import os, os.path
 import cPickle as pickle
 from cStringIO import StringIO
-from multiprocessing import Pipe
+from multiprocessing import Condition,Pipe
 from mock import patch,call,mock_open,Mock,PropertyMock
 from topolenum import topolenum as te
 
@@ -691,6 +691,98 @@ class TestSharedFIFOfileClass(unittest.TestCase):
     patched_Pipe.rdsconn.recv.assert_called_once_with()
     patched_Pipe.rdsconn.send.assert_called_once_with('FIFOfile002_')
     self.other_proc.join()
+  
+  @patch('os.path.getsize')
+  @patch('multiprocessing.Condition')
+  def test_FIFO_close_writing_end(self,patched_Condition,patched_getsize,
+                                  patched_NTF,patched_TmpDir,*args):
+    def patched_Condition_side_effect(*args,**kwargs):
+      patched_Condition.instance = Mock(wraps=Condition())
+      return patched_Condition.instance
+    patched_Condition.side_effect = patched_Condition_side_effect
+    
+    class TesterProc(te.multiprocessing.Process):
+      def __init__(self,fifo_obj,shutdown):
+        te.multiprocessing.Process.__init__(self)
+        self.fifo_obj = fifo_obj
+        self.shutdown = shutdown
+      
+      def run(self):
+        self.fifo_obj.start_OUT_end()
+        while not self.shutdown.wait(0.01):
+          pass
+        self.fifo_obj.close()
+    
+    self.fifo_obj = te.SharedFIFOfile(interval_len=0.01)
+    self.shutdown_EV = te.multiprocessing.Event()
+    self.other_proc = TesterProc(self.fifo_obj,self.shutdown_EV)
+    self.other_proc.start()
+    self.assertFalse(patched_Condition.instance.acquire.called)
+    
+    with patch('__builtin__.open',mock_open(),create=True) as patched_open:
+      self.fifo_obj.start_IN_end()
+    patched_Condition.instance.acquire.assert_called_once_with()
+    self.shutdown_EV.set()
+    self.assertFalse(patched_open.return_value.close.called)
+    self.assertFalse(patched_Condition.instance.wait.called)
+    self.assertFalse(patched_TmpDir.return_value.__exit__.called)
+    self.assertFalse(te.SharedFIFOfile.TMPFILE.writing_side_conn.closed)
+    self.assertFalse(te.SharedFIFOfile.TMPFILE.reading_side_conn.closed)
+    
+    self.fifo_obj.close()
+    patched_open.return_value.close.assert_called_once_with()
+    patched_Condition.instance.wait.assert_called_once_with(30)
+    patched_TmpDir.return_value.__exit__.assert_called_once_with(None,
+                                                                 None,None)
+    self.assertTrue(te.SharedFIFOfile.TMPFILE.writing_side_conn.closed)
+    self.assertTrue(te.SharedFIFOfile.TMPFILE.reading_side_conn.closed)
+    self.other_proc.join()
+  
+  @patch('os.path.getsize')
+  @patch('multiprocessing.Condition')
+  def test_FIFO_close_reading_end(self,patched_Condition,patched_getsize,
+                                  patched_NTF,*args):
+    def patched_Condition_side_effect(*args,**kwargs):
+      patched_Condition.instance = Mock(wraps=Condition())
+      return patched_Condition.instance
+    patched_Condition.side_effect = patched_Condition_side_effect
+    
+    def patched_NTF_ret_val_close_side_effect():
+      self.assertFalse(patched_Condition.instance.notify.called)
+      self.assertFalse(patched_Condition.instance.release.called)
+    patched_NTF.return_value.close.side_effect = \
+                                          patched_NTF_ret_val_close_side_effect
+    
+    class TesterProc(te.multiprocessing.Process):
+      def __init__(self,fifo_obj,shutdown):
+        te.multiprocessing.Process.__init__(self)
+        self.fifo_obj = fifo_obj
+        self.shutdown = shutdown
+      
+      def run(self):
+        with patch('__builtin__.open',mock_open(),create=True) as patched_open:
+          self.fifo_obj.start_IN_end()
+        while not self.shutdown.wait(0.01):
+          pass
+        self.fifo_obj.close()
+    
+    self.fifo_obj = te.SharedFIFOfile(interval_len=0.01)
+    self.shutdown_EV = te.multiprocessing.Event()
+    self.other_proc = TesterProc(self.fifo_obj,self.shutdown_EV)
+    self.other_proc.start()
+    self.shutdown_EV.set()
+    self.fifo_obj.start_OUT_end()
+    self.assertTrue(self.fifo_obj.spooler.is_alive())
+    self.assertFalse(patched_Condition.instance.acquire.called)
+    self.assertFalse(patched_NTF.return_value.close.called)
+    
+    self.fifo_obj.close()
+    self.other_proc.join()
+    self.assertFalse(self.fifo_obj.spooler.is_alive())
+    patched_Condition.instance.acquire.assert_called_once_with()
+    patched_NTF.return_value.close.assert_called_once_with()
+    patched_Condition.instance.notify.assert_called_once_with()
+    patched_Condition.instance.release.assert_called_once_with()
   
   def tearDown(self):
     if hasattr(self,'fifo_obj'):

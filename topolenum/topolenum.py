@@ -921,6 +921,8 @@ class SharedFIFOfile(FIFOfile):
     self.is_set = self.event.is_set
     self.clear = self.event.clear
     self.wait = self.event.wait
+    
+    self.shutdown_baton = multiprocessing.Condition()
   
   def start_OUT_end(self):
     self.side = 'reading'
@@ -935,6 +937,7 @@ class SharedFIFOfile(FIFOfile):
     self.side = 'writing'
     self.current_writing_file = self.TMPFILE(self.TMPFILE.writing_side_conn.recv())
     self.current_writing_file.open()
+    self.shutdown_baton.acquire()
   
   def _sync_safe_method_call(self,method,args,already_have_lock=False):
     if not already_have_lock:
@@ -962,12 +965,21 @@ class SharedFIFOfile(FIFOfile):
     self.set()
   
   def close(self):
-    if hasattr(self,'_rh'):
-      self._rh.close()
-      self.read_handle_closed.set()
-    if hasattr(self,'_wh'):
-      self.read_handle_closed.wait()
-      self._wh.close()
+    if self.side == 'reading':
+      self.spooler.stop.set()
+      self.spooler.join(timeout=10)
+      self.shutdown_baton.acquire()
+      self.current_reading_file.discard()
+      for tmpfile in self.TMPFILE.file_spool:
+        tmpfile.discard()
+      self.shutdown_baton.notify()
+      self.shutdown_baton.release()
+    else:
+      self.current_writing_file.close()
+      self.shutdown_baton.wait(30)
+      self.tmpdir_obj.__exit__(None,None,None)
+      self.TMPFILE.writing_side_conn.close()
+      self.TMPFILE.reading_side_conn.close()
 
 
 class SharedCladeReprTracker(CladeReprTracker):
