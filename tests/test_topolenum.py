@@ -1,5 +1,6 @@
 import unittest
 import os, os.path
+import time
 import cPickle as pickle
 from cStringIO import StringIO
 from multiprocessing import Condition,Pipe
@@ -487,8 +488,7 @@ class TestSharedFIFOfileClassSpoolerThreadClass(unittest.TestCase):
     self.assertFalse(self.mock_spool_callable.called)
     self.assertFalse(self.tmpfile_name_mock_property.called)
     self.writing_end_conn.send(None)
-    import time
-    time.sleep(0.1) # Things won't happen in the other thread instantaneously
+    time.sleep(0.1) # Things don't happen instantaneously in the other thread
     self.mock_spool_callable.assert_called_once_with()
     self.tmpfile_name_mock_property.assert_called_once_with()
     self.assertTrue(self.writing_end_conn.poll())
@@ -805,6 +805,154 @@ class TestSharedFIFOfileClass(unittest.TestCase):
       te.SharedFIFOfile.TMPFILE.writing_side_conn.close()
     if hasattr(te.SharedFIFOfile.TMPFILE,'reading_side_conn'):
       te.SharedFIFOfile.TMPFILE.reading_side_conn.close()
+
+
+class TestSharedFIFOfileIntegration(unittest.TestCase):
+  
+  def setUp(self):
+    reload(te)
+    self.fifo_obj = te.SharedFIFOfile(top_path=None,
+                                      max_file_size_GB=1.7695128917694092e-08,
+                                      size_check_delay=0,interval_len=0.01)
+    self.shutdown_EV = te.multiprocessing.Event()
+  
+  def test_writing_side_startup_rollover_and_closing(self):
+    class TesterProc(te.multiprocessing.Process):
+      def __init__(self,fifo_obj,call_pop,conn,shutdown):
+        te.multiprocessing.Process.__init__(self)
+        self.fifo_obj = fifo_obj
+        self.call_pop = call_pop
+        self.conn = conn
+        self.shutdown = shutdown
+        
+      def run(self):
+        self.fifo_obj.start_OUT_end()
+        while not self.shutdown.is_set():
+          if self.call_pop.wait(0.01):
+            self.conn.send(self.fifo_obj.pop())
+            self.call_pop.clear()
+          else:
+            continue
+        self.fifo_obj.close()
+      
+    call_pop_EV = te.multiprocessing.Event()
+    conn1,conn2 = te.multiprocessing.Pipe()
+    self.other_proc = TesterProc(self.fifo_obj,call_pop_EV,conn2,
+                                 self.shutdown_EV)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),0)
+      
+    self.other_proc.start()
+    time.sleep(0.01) # Other proc needs time to run its startup
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),1)
+    self.fifo_obj.start_IN_end()
+    self.assertEqual(os.path.basename(self.fifo_obj.current_writing_file.name),
+                     os.listdir(self.fifo_obj.tmpdir_obj.name)[0])
+    self.fifo_obj.push(1)
+    self.fifo_obj.push(2)
+    self.fifo_obj.push(3)
+    self.fifo_obj.push(4)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),1)
+    self.fifo_obj.push(5)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),2)
+    self.assertNotEqual(os.path.basename(self.fifo_obj.current_writing_file.name),
+                        os.listdir(self.fifo_obj.tmpdir_obj.name)[0])
+    self.fifo_obj.push(6)
+    self.fifo_obj.push(7)
+    self.fifo_obj.push(8)
+    self.fifo_obj.push(9)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),3)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),1)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),2)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),3)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),4)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),3)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),5)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),2)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),6)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),7)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),8)
+    call_pop_EV.set()
+    self.assertEqual(conn1.recv(),9)
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),1)
+    self.assertEqual(os.path.basename(self.fifo_obj.current_writing_file.name),
+                     os.listdir(self.fifo_obj.tmpdir_obj.name)[0])
+     
+    self.shutdown_EV.set()
+    self.fifo_obj.close()
+    self.assertFalse(os.path.exists(self.fifo_obj.tmpdir_obj.name))
+    self.other_proc.join()
+  
+  def test_reading_side_startup_rollover_and_closing(self):
+    class TesterProc(te.multiprocessing.Process):
+      def __init__(self,fifo_obj,call_push,conn,shutdown):
+        te.multiprocessing.Process.__init__(self)
+        self.fifo_obj = fifo_obj
+        self.call_push = call_push
+        self.conn = conn
+        self.shutdown = shutdown
+         
+      def run(self):
+        self.fifo_obj.start_IN_end()
+        counter = 0
+        while not self.shutdown.is_set():
+          if self.call_push.wait(0.01):
+            counter += 1
+            self.fifo_obj.push(counter)
+            self.conn.send(counter)
+            self.call_push.clear()
+          else:
+            continue
+        self.fifo_obj.close()
+     
+    call_push_EV = te.multiprocessing.Event()
+    conn1,conn2 = te.multiprocessing.Pipe()
+    self.other_proc = TesterProc(self.fifo_obj,call_push_EV,conn2,
+                                 self.shutdown_EV)
+    self.other_proc.start()
+    self.fifo_obj.start_OUT_end()
+    self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),1)
+    self.assertEqual(os.path.basename(self.fifo_obj.current_reading_file.name),
+                     os.listdir(self.fifo_obj.tmpdir_obj.name)[0])
+       
+    self.shutdown_EV.set()
+    self.fifo_obj.close()
+    self.other_proc.join()
+    self.assertFalse(os.path.exists(self.fifo_obj.tmpdir_obj.name))
+    # Currently the SharedFIFOfile class expects the process holding the writing
+    # end to finish AFTER the process holding the reading end. When the reading
+    # end's copy of tmpdir_obj is destroyed, its _closed flag is set to True
+    # because the writing end is responsible for calling tmpdir_obj.__exit__().
+    # The writing end's copy of tmpdir_obj is destroyed after the writing end
+    # calls __exit__(). However, for the purposes of this test we want the main
+    # process to hold the reading end, meaning the reading end's copy of
+    # tmpdir_obj is destroyed after the writing end has called __exit__() on
+    # its own copy, deleting the temp directory. However, the reading end's copy
+    # does not know this, and it's _closed flag is still set to False. When the
+    # reading end's copy is the destroyed on exit, tmpdir_obj.__del__() calls
+    # its cleanup method and tries to delete a non-existent directory, resulting
+    # in an OSError. To avoid this, we set the _closed flag to True by hand.
+    self.fifo_obj.tmpdir_obj._closed = True
+  
+  def tearDown(self):
+    if not self.shutdown_EV.is_set():
+      self.shutdown_EV.set()
+    
+    if hasattr(self,'other_proc'):
+      if self.other_proc.is_alive():
+        self.other_proc.join(timeout=0.1)
+        if self.other_proc.is_alive():
+          self.other_proc.terminate()
+    
+    if os.path.exists(self.fifo_obj.tmpdir_obj.name):
+      self.fifo_obj.tmpdir_obj.__exit__(None,None,None)
 
 
 if __name__ == "__main__":
