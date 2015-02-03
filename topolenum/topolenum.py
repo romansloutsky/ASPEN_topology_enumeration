@@ -1098,8 +1098,8 @@ class QueueLoader(multiprocessing.Process):
 
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
-               score_submission_queue,seed_assembly,pass_to_workspace,
-               results_fifo):
+                    score_submission_queue,seed_assembly,pass_to_workspace,
+                    results_queue):
     multiprocessing.Process.__init__(self)
     
     self.queue = queue
@@ -1109,9 +1109,9 @@ class AssemblerProcess(multiprocessing.Process):
     self.pass_to_workspace = pass_to_workspace
     self.seed_assembly = seed_assembly
     
-    self.results_fifo = results_fifo
     self.finished = multiprocessing.Event()
     self.shutdown = multiprocessing.Event()
+    self.results_queue = results_queue
   
   def run(self):
     self.fifo = SharedFIFOfile(suffix='--'+self.name)
@@ -1144,10 +1144,9 @@ class AssemblerProcess(multiprocessing.Process):
       self.fifo.tmpdir_obj.__exit__(None,None,None)
       self.queue_loader_p.terminate()
       raise
-    self.results_fifo.start_IN_end()
-    self.results_fifo.push_all(self.assemblies.accepted_assemblies)
-    self.results_fifo.push('SHUTDOWN')
-    self.results_fifo.close()
+    for assembly in self.assemblies.accepted_assemblies:
+      self.results_queue.put(assembly)
+    self.results_queue.put('FINISHED')
     return
 
 
