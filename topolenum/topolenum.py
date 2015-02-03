@@ -1254,7 +1254,8 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
 
 
 def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
-                         proceed_permission_callable=lambda: True,**kwargs):
+                         proceed_permission_callable=lambda: True,
+                         observer_callable=None,**kwargs):
   enumeration_proc = MainTopologyEnumerationProcess(leafdist_histograms,
                                                     leaves_to_assemble,
                                                     **kwargs)
@@ -1266,7 +1267,8 @@ def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
       workers[new_worker[0]] = new_worker[1]
   
   while not enumeration_proc.finished.wait(10) and proceed_permission_callable():
-    continue
+    if observer_callable is not None:
+      observer_callable(enumeration_proc,workers)
   
   results = []
   finished_worker_counter = 0
