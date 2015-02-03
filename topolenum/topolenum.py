@@ -1166,6 +1166,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.get_PIDs,self.send_PIDs = multiprocessing.Pipe(duplex=False)
     self.stop = multiprocessing.Event()
     self.finished = multiprocessing.Event()
+    self.shutdown = multiprocessing.Event()
     
     self.histograms = leafdist_histograms
     self.leaves = leaves_to_assemble
@@ -1236,7 +1237,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
         p.shutdown.set()
       
       self.finished.set()
-      while not self.stop.wait(1):
+      while not self.shutdown.wait(1):
         continue
       
       for p in procs:
@@ -1270,6 +1271,7 @@ def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
     if observer_callable is not None:
       observer_callable(enumeration_proc,workers)
   
+  enumeration_proc.stop.set()
   results = []
   finished_worker_counter = 0
   while finished_worker_counter < enumeration_proc.num_workers:
@@ -1279,7 +1281,7 @@ def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
     else:
       results.append(received)
   
-  enumeration_proc.stop.set()
+  enumeration_proc.shutdown.set()
   enumeration_proc.join(30)
   if enumeration_proc.is_alive():
     enumeration_proc.terminate()
