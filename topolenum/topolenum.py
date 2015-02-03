@@ -1232,7 +1232,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
         p.shutdown.set()
       
       self.finished.set()
-      while self.stop.wait(1):
+      while not self.stop.wait(1):
         continue
       
       for p in procs:
