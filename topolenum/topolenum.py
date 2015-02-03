@@ -1163,6 +1163,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.results_queue = multiprocessing.Queue()
     self.scores_queue = multiprocessing.Queue()
     self.min_score = multiprocessing.Value('d',-sys.float_info.max)
+    self.get_PIDs,self.send_PIDs = multiprocessing.Pipe(duplex=False)
     self.stop = multiprocessing.Event()
     self.finished = multiprocessing.Event()
     
@@ -1181,6 +1182,8 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.results_queue.join_thread()
     self.scores_queue.close()
     self.scores_queue.join_thread()
+    self.send_PIDs.close()
+    self.get_PIDs.close()
   
   def run(self):
     zeroth_assembly = TreeAssembly(self.histograms,self.constraint_freq_cutoff,
@@ -1212,6 +1215,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                                              pickle.HIGHEST_PROTOCOL))
       for p in procs:
         p.start()
+        self.send_PIDs.send((p.pid,p.name))
       
       while any(not p.finished.is_set() for p in procs)\
                                                     and not self.stop.is_set():
@@ -1255,6 +1259,11 @@ def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
                                                     leaves_to_assemble,
                                                     **kwargs)
   enumeration_proc.start()
+  workers = {}
+  while len(workers) < enumeration_proc.num_workers:
+    if enumeration_proc.get_PIDs.poll(1):
+      new_worker = enumeration_proc.get_PIDs.recv()
+      workers[new_worker[0]] = new_worker[1]
   
   while not enumeration_proc.finished.wait(10) and proceed_permission_callable():
     continue
