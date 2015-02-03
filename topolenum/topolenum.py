@@ -1150,89 +1150,132 @@ class AssemblerProcess(multiprocessing.Process):
     return
 
 
-def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
-                         constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
-                         max_workspace_size=10000,max_queue_size=10000,
-                         num_requested_topologies=1000,num_workers=1):
-  assembly_queue_manager = multiprocessing.Manager()
-  queue = assembly_queue_manager.Queue(max_queue_size)
+class MainTopologyEnumerationProcess(multiprocessing.Process):
+  def __init__(self,leafdist_histograms,leaves_to_assemble,
+                    constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
+                    max_workspace_size=10000,max_queue_size=10000,
+                    num_requested_topologies=1000,num_workers=1):
+    multiprocessing.Process.__init__(self)
+    self.assembly_queue_manager = multiprocessing.Manager()
+    self.assembly_queue = self.assembly_queue_manager.Queue(max_queue_size)
+    self.encountered_assemblies_manager = multiprocessing.Manager()
+    self.encountered_assemblies_dict = self.encountered_assemblies_manager.dict()
+    self.results_queue = multiprocessing.Queue()
+    self.scores_queue = multiprocessing.Queue()
+    self.min_score = multiprocessing.Value('d',-sys.float_info.max)
+    self.stop = multiprocessing.Event()
+    self.finished = multiprocessing.Event()
+    
+    self.histograms = leafdist_histograms
+    self.leaves = leaves_to_assemble
+    self.constraint_freq_cutoff = constraint_freq_cutoff
+    self.absolute_freq_cutoff = absolute_freq_cutoff
+    self.max_workspace_size = max_workspace_size
+    self.num_requested_topologies = num_requested_topologies
+    self.num_workers = num_workers
   
-  encountered_assemblies_manager = multiprocessing.Manager()
-  encountered_assemblies_dict = encountered_assemblies_manager.dict()
+  def clean_up(self):
+    self.assembly_queue_manager.shutdown()
+    self.encountered_assemblies_manager.shutdown()
+    self.results_queue.close()
+    self.results_queue.join_thread()
+    self.scores_queue.close()
+    self.scores_queue.join_thread()
   
-  zeroth_assembly = TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
-                               leaves_to_assemble,absolute_freq_cutoff,
-                               keep_alive_when_pickling=False)
-  seed_assemblies = [zeroth_assembly]
-  while len(seed_assemblies) < num_workers:
-    seed_assemblies = [a for old_a in seed_assemblies
-                       for a in old_a.generate_extensions(
-                                SharedCladeReprTracker(leaves_to_assemble,
-                                                       encountered_assemblies_dict))]
+  def run(self):
+    zeroth_assembly = TreeAssembly(self.histograms,self.constraint_freq_cutoff,
+                                   self.leaves,self.absolute_freq_cutoff,
+                                   keep_alive_when_pickling=False)
+    seed_assemblies = [zeroth_assembly]
+    while len(seed_assemblies) < self.num_workers:
+      seed_assemblies = [a for old_a in seed_assemblies
+                         for a in old_a.generate_extensions(
+                                  SharedCladeReprTracker(self.leaves,
+                                            self.encountered_assemblies_dict))]
   
-  workspace_args = namedtuple('ArgsKwargs',['args','kwargs'])((leaves_to_assemble,),
-                                    {'num_requested_trees':num_requested_topologies,
-                                     'max_workspace_size':max_workspace_size})
-  accepted_scores = []
-  try:
-    results_fifos = [SharedFIFOfile() for i in xrange(num_workers)]
-    
-    scores_queue = multiprocessing.Queue()
-    min_score = multiprocessing.Value('d',-sys.float_info.max)
-    
-    procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,
-                              scores_queue,seed_assemblies.pop(),workspace_args,
-                              results_fifos[i])
-             for i in xrange(num_workers)]
-    while seed_assemblies:
-      queue.put(pickle.dumps(seed_assemblies.pop(),pickle.HIGHEST_PROTOCOL))
-    
-    for p in procs:
-      p.start()
-    while any(not p.finished.is_set() for p in procs):
-      try:
-        proposed_score = scores_queue.get(timeout=0.05)
-        if len(accepted_scores) < num_requested_topologies\
-                                      or proposed_score > accepted_scores[-1]:
-          accepted_scores.append(proposed_score)
-          accepted_scores.sort(reverse=True)
-          while len(accepted_scores) > num_requested_topologies:
-            accepted_scores.pop()
-          if len(accepted_scores) == num_requested_topologies:
-            min_score.value = accepted_scores[-1]
-      except Queue.Empty:
-        continue
-    
-    for p in procs:
-      p.shutdown.set()
-    
-    results = []
-    for rf in results_fifos:
-      rf.start_OUT_end()
-      while True:
-        popped = rf.pop()
-        if popped is None:
+    workspace_args = namedtuple('ArgsKwargs',
+                                ['args','kwargs'])((self.leaves,),
+                                                   {'num_requested_trees':
+                                                      self.num_requested_topologies,
+                                                    'max_workspace_size':
+                                                      self.max_workspace_size})
+    self.accepted_scores = []
+    try:
+      procs = [AssemblerProcess(self.assembly_queue,
+                                self.encountered_assemblies_dict,
+                                self.min_score,self.scores_queue,
+                                seed_assemblies.pop(),workspace_args,
+                                self.results_queue)
+               for i in xrange(self.num_workers)]
+      while seed_assemblies:
+        self.assembly_queue.put(pickle.dumps(seed_assemblies.pop(),
+                                             pickle.HIGHEST_PROTOCOL))
+      for p in procs:
+        p.start()
+      
+      while any(not p.finished.is_set() for p in procs)\
+                                                    and not self.stop.is_set():
+        try:
+          proposed_score = self.scores_queue.get(timeout=0.05)
+          if len(self.accepted_scores) < self.num_requested_topologies\
+                                  or proposed_score > self.accepted_scores[-1]:
+            self.accepted_scores.append(proposed_score)
+            self.accepted_scores.sort(reverse=True)
+            while len(self.accepted_scores) > self.num_requested_topologies:
+              self.accepted_scores.pop()
+            if len(self.accepted_scores) == self.num_requested_topologies:
+              self.min_score.value = self.accepted_scores[-1]
+        except Queue.Empty:
           continue
-        elif popped == 'SHUTDOWN':
-          break
-        else:
-          results.append(popped)
-      rf.close()
-        
-    results.sort(key=lambda x: x.score,reverse=True)
-    while len(results) > num_requested_topologies:
-      results.pop()
+      
+      for p in procs:
+        p.shutdown.set()
+      
+      self.finished.set()
+      while self.stop.wait(1):
+        continue
+      
+      for p in procs:
+        p.join(timeout=10)
+        if p.is_alive():
+          p.terminate()
     
-    for p in procs:
-      p.join(timeout=10)
-      if p.is_alive():
-        p.terminate()
-  except Exception as e:
-    for p in procs:
-      p.terminate()
-    raise
-  finally:
-    assembly_queue_manager.shutdown()
-    encountered_assemblies_manager.shutdown()
+    except Exception as e:
+      for p in procs:
+        p.shutdown.set()
+        p.join(timeout=15)
+        if p.is_alive():
+          p.terminate()
+      raise
+
+
+def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
+                         proceed_permission_callable=lambda: True,**kwargs):
+  enumeration_proc = MainTopologyEnumerationProcess(leafdist_histograms,
+                                                    leaves_to_assemble,
+                                                    **kwargs)
+  enumeration_proc.start()
+  
+  while not enumeration_proc.finished.wait(10) and proceed_permission_callable():
+    continue
+  
+  results = []
+  finished_worker_counter = 0
+  while finished_worker_counter < enumeration_proc.num_workers:
+    received = enumeration_proc.results_queue.get()
+    if received == 'FINISHED':
+      finished_worker_counter += 1
+    else:
+      results.append(received)
+  
+  enumeration_proc.stop.set()
+  enumeration_proc.join(30)
+  if enumeration_proc.is_alive():
+    enumeration_proc.terminate()
+  enumeration_proc.clean_up()
+  
+  results.sort(key=lambda x: x.score,reverse=True)
+  while len(results) > enumeration_proc.num_requested_topologies:
+    results.pop()
   return results
 
