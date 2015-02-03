@@ -1099,7 +1099,7 @@ class QueueLoader(multiprocessing.Process):
 class AssemblerProcess(multiprocessing.Process):
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
                score_submission_queue,seed_assembly,pass_to_workspace,
-               finished_EV,shutdown_EV,results_fifo):
+               results_fifo):
     multiprocessing.Process.__init__(self)
     
     self.queue = queue
@@ -1109,9 +1109,9 @@ class AssemblerProcess(multiprocessing.Process):
     self.pass_to_workspace = pass_to_workspace
     self.seed_assembly = seed_assembly
     
-    self.finished = finished_EV
-    self.shutdown = shutdown_EV
     self.results_fifo = results_fifo
+    self.finished = multiprocessing.Event()
+    self.shutdown = multiprocessing.Event()
   
   def run(self):
     self.fifo = SharedFIFOfile(suffix='--'+self.name)
@@ -1176,9 +1176,6 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
                                      'max_workspace_size':max_workspace_size})
   accepted_scores = []
   try:
-    finished_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
-    shutdown_event_vars = [multiprocessing.Event() for i in xrange(num_workers)]
-    
     results_fifos = [SharedFIFOfile() for i in xrange(num_workers)]
     
     scores_queue = multiprocessing.Queue()
@@ -1186,7 +1183,6 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     
     procs = [AssemblerProcess(queue,encountered_assemblies_dict,min_score,
                               scores_queue,seed_assemblies.pop(),workspace_args,
-                              finished_event_vars[i],shutdown_event_vars[i],
                               results_fifos[i])
              for i in xrange(num_workers)]
     while seed_assemblies:
@@ -1194,7 +1190,7 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
     
     for p in procs:
       p.start()
-    while any(not fev.is_set() for fev in finished_event_vars):
+    while any(not p.finished.is_set() for p in procs):
       try:
         proposed_score = scores_queue.get(timeout=0.05)
         if len(accepted_scores) < num_requested_topologies\
@@ -1208,8 +1204,8 @@ def enumerate_topologies(pwleafdist_histograms,leaves_to_assemble,
       except Queue.Empty:
         continue
     
-    for sev in shutdown_event_vars:
-      sev.set()
+    for p in procs:
+      p.shutdown.set()
     
     results = []
     for rf in results_fifos:
