@@ -873,7 +873,7 @@ class TestSharedFIFOfileIntegration(unittest.TestCase):
     self.fifo_obj.push(5)
     self.assertEqual(len(os.listdir(self.fifo_obj.tmpdir_obj.name)),2)
     self.assertNotEqual(os.path.basename(self.fifo_obj.current_writing_file.name),
-                        os.listdir(self.fifo_obj.tmpdir_obj.name)[0])
+                        sorted(os.listdir(self.fifo_obj.tmpdir_obj.name))[0])
     self.fifo_obj.push(6)
     self.fifo_obj.push(7)
     self.fifo_obj.push(8)
