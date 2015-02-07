@@ -1196,6 +1196,10 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.max_workspace_size = max_workspace_size
     self.num_requested_topologies = num_requested_topologies
     self.num_workers = num_workers
+    self.zeroth_assembly = TreeAssembly(self.histograms,
+                                        self.constraint_freq_cutoff,
+                                        self.leaves,self.absolute_freq_cutoff,
+                                        keep_alive_when_pickling=False)
   
   def clean_up(self):
     self.assembly_queue_manager.shutdown()
@@ -1208,10 +1212,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.get_PIDs.close()
   
   def run(self):
-    zeroth_assembly = TreeAssembly(self.histograms,self.constraint_freq_cutoff,
-                                   self.leaves,self.absolute_freq_cutoff,
-                                   keep_alive_when_pickling=False)
-    seed_assemblies = [zeroth_assembly]
+    seed_assemblies = [self.zeroth_assembly]
     while len(seed_assemblies) < self.num_workers:
       seed_assemblies = [a for old_a in seed_assemblies
                          for a in old_a.generate_extensions(
