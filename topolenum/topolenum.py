@@ -288,8 +288,9 @@ class TreeAssembly(object):
     type(self).pwdist_histograms_dict = {leafpair:dict(dist_histogram)
                                          for leafpair,dist_histogram in pwleafdist_histograms}
     
-    # Again, a mutable variable, though I would like it to be immutable is possible
+    # More technically mutable variables that should not be changed by instances
     type(self).abs_cutoff = absolute_freq_cutoff
+    type(self).leaves_master = set(leaves_to_assemble)
     
     #===========================================================================
     # END of class attributes
@@ -302,8 +303,24 @@ class TreeAssembly(object):
     
     self.keep_alive = keep_alive_when_pickling
   
+  def rebuild_constraints_idx(self):
+    self.constraints_idx = [i for i,_ in enumerate(self.constraints_master)]
+    intra_clade_pairs = [frozenset(p) for c in self.built_clades for p in
+                                        itertools.combinations(c.leaf_names,2)]
+    drop_these_idx = [i for i,d in enumerate(self.constraints_master)
+                                        if d.leaves in intra_clade_pairs][::-1]
+    for i in drop_these_idx:
+      self.constraints_idx.pop(i)
+    l_accounted_for = set.union(*[set(leafset) for leafset in
+                                                     self.pairs_accounted_for])
+    drop_these_idx = [idx for idx,i in enumerate(self.constraints_idx)
+                      if self.constraints_master[i].dist == 1 and
+                      self.constraints_master[i].leaves & l_accounted_for][::-1]
+    for i in drop_these_idx:
+      self.constraints_idx.pop(i)
+  
   def __getstate__(self):
-    state = {k:v for k,v in self.__dict__.items() if k != 'built_clades'}
+    state = {'score':self.score,'keep_alive':self.keep_alive}
     if self.keep_alive:
       state['built_clades'] = [c.check_in_pickle() for c in self.built_clades]
     else:
@@ -320,6 +337,10 @@ class TreeAssembly(object):
     else:
       self.__dict__['built_clades'] = [T.rebuild_on_unpickle(clade_repr)
                                        for clade_repr in state['built_clades']]
+    self.free_leaves = self.leaves_master -\
+                          set.union(*[set(leafset) for leafset in
+                                                     self.pairs_accounted_for])
+    self.rebuild_constraints_idx()
   
   def copy(self):
     copy_of_self = type(self).__new__(type(self))
