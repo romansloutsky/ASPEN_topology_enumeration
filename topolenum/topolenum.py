@@ -863,10 +863,12 @@ class AssemblyWorkspace(object):
     else:
       return assembly
   
-  def iterate(self):
+  def iterate(self,interrupt_callable=lambda: False):
     drop_from_workspace_idx = []
     workspace_this_iter = [assembly for assembly in self.workspace]
     for i,assembly in enumerate(workspace_this_iter):
+      if interrupt_callable():
+        return
       extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
                                                          self.curr_min_score)
       if extended_assemblies is None:
@@ -1082,9 +1084,9 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     else:
       return assembly
   
-  def iterate(self):
+  def iterate(self,*args,**kwargs):
     try:
-      AssemblyWorkspace.iterate(self)
+      AssemblyWorkspace.iterate(self,*args,**kwargs)
     except self.AssemblyWorkFinished:
       return 'FINISHED'
     finally:
@@ -1150,7 +1152,7 @@ class AssemblerProcess(multiprocessing.Process):
       iter_counter = 0
       while not self.shutdown.is_set():
         iter_counter += 1
-        iter_result = self.assemblies.iterate()
+        iter_result = self.assemblies.iterate(self.shutdown.is_set)
         if iter_result == 'FINISHED':
           self.finished.set()
           if self.shutdown.wait(5):
