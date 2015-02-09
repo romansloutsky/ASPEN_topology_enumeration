@@ -291,6 +291,7 @@ class TreeAssembly(object):
     # More technically mutable variables that should not be changed by instances
     type(self).abs_cutoff = absolute_freq_cutoff
     type(self).leaves_master = set(leaves_to_assemble)
+    type(self).keep_alive = keep_alive_when_pickling
     
     #===========================================================================
     # END of class attributes
@@ -300,8 +301,6 @@ class TreeAssembly(object):
     self.free_leaves = set(leaves_to_assemble)
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
-    
-    self.keep_alive = keep_alive_when_pickling
   
   def rebuild_constraints_idx(self):
     self.constraints_idx = [i for i,_ in enumerate(self.constraints_master)]
@@ -320,7 +319,7 @@ class TreeAssembly(object):
       self.constraints_idx.pop(i)
   
   def __getstate__(self):
-    state = {'score':self.score,'keep_alive':self.keep_alive}
+    state = {'score':self.score}
     if self.keep_alive:
       state['built_clades'] = [c.check_in_pickle() for c in self.built_clades]
     else:
