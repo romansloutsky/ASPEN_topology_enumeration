@@ -1128,7 +1128,7 @@ class AssemblerProcess(multiprocessing.Process):
   
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
                     score_submission_queue,seed_assembly,pass_to_workspace,
-                    results_queue):
+                    results_queue,fifo_max_file_size=1.0):
     multiprocessing.Process.__init__(self,name='AssemblerProcess-'\
                                                           +str(self.instcount))
     
@@ -1138,13 +1138,15 @@ class AssemblerProcess(multiprocessing.Process):
     self.score_submission_queue = score_submission_queue
     self.pass_to_workspace = pass_to_workspace
     self.seed_assembly = seed_assembly
+    self.fifo_max_file_size = fifo_max_file_size
     
     self.finished = multiprocessing.Event()
     self.shutdown = multiprocessing.Event()
     self.results_queue = results_queue
   
   def run(self):
-    self.fifo = SharedFIFOfile(suffix='--'+self.name)
+    self.fifo = SharedFIFOfile(suffix='--'+self.name,
+                               max_file_size_GB=self.fifo_max_file_size)
     self.pass_to_workspace.kwargs['seed_assembly'] = self.seed_assembly
     self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
                                                   self.encountered_assemblies_dict,
@@ -1184,7 +1186,8 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
   def __init__(self,leafdist_histograms,leaves_to_assemble,
                     constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
                     max_workspace_size=10000,max_queue_size=10000,
-                    num_requested_topologies=1000,num_workers=1):
+                    fifo_max_file_size=1.0,num_requested_topologies=1000,
+                    num_workers=1):
     multiprocessing.Process.__init__(self)
     self.assembly_queue_manager = multiprocessing.Manager()
     self.assembly_queue = self.assembly_queue_manager.Queue(max_queue_size)
@@ -1203,6 +1206,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.constraint_freq_cutoff = constraint_freq_cutoff
     self.absolute_freq_cutoff = absolute_freq_cutoff
     self.max_workspace_size = max_workspace_size
+    self.fifo_max_file_size = fifo_max_file_size
     self.num_requested_topologies = num_requested_topologies
     self.num_workers = num_workers
     self.zeroth_assembly = TreeAssembly(self.histograms,
@@ -1240,7 +1244,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                                 self.encountered_assemblies_dict,
                                 self.min_score,self.scores_queue,
                                 seed_assemblies.pop(),workspace_args,
-                                self.results_queue)
+                                self.results_queue,self.fifo_max_file_size)
                for i in xrange(self.num_workers)]
       while seed_assemblies:
         self.assembly_queue.put(pickle.dumps(seed_assemblies.pop(),
