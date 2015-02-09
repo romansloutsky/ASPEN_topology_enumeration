@@ -1120,10 +1120,17 @@ class QueueLoader(multiprocessing.Process):
 
 
 class AssemblerProcess(multiprocessing.Process):
+  def __new__(cls,*args,**kwargs):
+    if not hasattr(cls,'instcount'):
+      cls.instcount = 0
+    cls.instcount += 1
+    return multiprocessing.Process.__new__(cls,*args,**kwargs)
+  
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
                     score_submission_queue,seed_assembly,pass_to_workspace,
                     results_queue):
-    multiprocessing.Process.__init__(self)
+    multiprocessing.Process.__init__(self,name='AssemblerProcess-'\
+                                                          +str(self.instcount))
     
     self.queue = queue
     self.min_score = shared_min_score
