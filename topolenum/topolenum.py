@@ -1095,7 +1095,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
 
 class QueueLoader(multiprocessing.Process):
   def __init__(self,fifo,close_fifo_EV,queue):
-    multiprocessing.Process.__init__(self)
+    multiprocessing.Process.__init__(self,name=multiprocessing.current_process().name+'--QueueLoader')
     self.fifo = fifo
     self.close_fifo = close_fifo_EV
     self.queue = queue
