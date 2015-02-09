@@ -1094,22 +1094,21 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
 
 
 class QueueLoader(multiprocessing.Process):
-  def __init__(self,fifo,queue):
+  def __init__(self,fifo,close_fifo_EV,queue):
     multiprocessing.Process.__init__(self)
     self.fifo = fifo
+    self.close_fifo = close_fifo_EV
     self.queue = queue
     self.daemon = True
   
   def run(self):
     self.fifo.start_OUT_end()
-    while True:
+    while not self.close_fifo.is_set():
       popped = self.fifo.pop()
       if popped is None:
         continue
-      elif popped == 'SHUTDOWN':
-        break
       else:
-        while True:
+        while not self.close_fifo.is_set():
           try:
             self.queue.put(popped,timeout=5)
             break
@@ -1140,6 +1139,8 @@ class AssemblerProcess(multiprocessing.Process):
     self.seed_assembly = seed_assembly
     self.fifo_max_file_size = fifo_max_file_size
     
+    self.close_fifo = multiprocessing.Event()
+    
     self.finished = multiprocessing.Event()
     self.shutdown = multiprocessing.Event()
     self.results_queue = results_queue
@@ -1153,7 +1154,7 @@ class AssemblerProcess(multiprocessing.Process):
                                                   self.score_submission_queue,
                                                   *self.pass_to_workspace.args,
                                                   **self.pass_to_workspace.kwargs)
-    self.queue_loader_p = QueueLoader(self.fifo,self.queue)
+    self.queue_loader_p = QueueLoader(self.fifo,self.close_fifo,self.queue)
     self.queue_loader_p.start()
     self.fifo.start_IN_end()
     try:
@@ -1168,7 +1169,7 @@ class AssemblerProcess(multiprocessing.Process):
             break
           else:
             continue
-      self.fifo.push('SHUTDOWN')
+      self.close_fifo.set()
       self.fifo.close()
       self.queue_loader_p.join(timeout=15)
     except:
