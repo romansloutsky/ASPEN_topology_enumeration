@@ -1063,7 +1063,9 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
               raise self.AssemblyWorkFinished
             else:
               continue
-      self.workspace.append(pickle.loads(pickled_assembly))
+      popped = pickle.loads(pickled_assembly)
+      if popped.score > self.curr_min_score:
+        self.workspace.append(popped)
   
   def push_to_fifo(self,push_these):
     self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
