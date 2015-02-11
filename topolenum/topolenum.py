@@ -847,7 +847,7 @@ class AssemblyWorkspace(object):
         self.push_to_fifo(new_assemblies)
     self.top_off_workspace()
   
-  def process_extended_assembly(self,assembly):
+  def check_completion_status(self,assembly):
     if assembly.complete:
       if len(self.accepted_assemblies) < self.num_requested_trees\
                                       or assembly.score > self.curr_min_score:
@@ -875,10 +875,10 @@ class AssemblyWorkspace(object):
         continue
       else:
         assert assembly is extended_assemblies[-1]
-        if self.process_extended_assembly(extended_assemblies.pop()) is None:
+        if self.check_completion_status(extended_assemblies.pop()) is None:
           drop_from_workspace_idx.append(i)
       self.update_workspace([asbly for asbly in extended_assemblies
-                             if self.process_extended_assembly(asbly) is not None])
+                             if self.check_completion_status(asbly) is not None])
     for i in drop_from_workspace_idx[::-1]:
       self.workspace.pop(i)
     if not self.reached_num_requested_trees:
@@ -1062,7 +1062,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
                        for item in push_these)
   
-  def process_extended_assembly(self,assembly):
+  def check_completion_status(self,assembly):
     if assembly.complete:
       if assembly.score > self.curr_min_score:
         self.score_submission_queue.put(assembly.score)
