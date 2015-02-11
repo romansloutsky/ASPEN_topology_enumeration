@@ -815,6 +815,10 @@ class AssemblyWorkspace(object):
     
     self.iternum = 1
   
+  def apply_acceptance_logic_to_popped_assembly(self,popped):
+    if popped.score > self.curr_min_score:
+      self.workspace.append(popped)
+  
   def top_off_workspace(self):
     if self.fifo is None or isinstance(self.fifo,str):
       return
@@ -824,8 +828,7 @@ class AssemblyWorkspace(object):
         if popped is None:
           break
         else:
-          if popped.score > self.curr_min_score:
-            self.workspace.append(popped)
+          self.apply_acceptance_logic_to_popped_assembly(popped)
   
   def push_to_fifo(self,push_these):
     if self.fifo is None:
@@ -1055,8 +1058,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
             else:
               continue
       popped = pickle.loads(pickled_assembly)
-      if popped.score > self.curr_min_score:
-        self.workspace.append(popped)
+      self.apply_acceptance_logic_to_popped_assembly(popped)
   
   def push_to_fifo(self,push_these):
     self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
