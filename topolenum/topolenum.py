@@ -838,15 +838,19 @@ class AssemblyWorkspace(object):
     for item in push_these:
       self.fifo.push(item)
   
+  def load_assemblies_into_workspace(self,assemblies,max_size=None):
+    if max_size is None:
+      max_size = self.max_workspace_size
+    while len(self.workspace) < max_size:
+      try:
+        self.workspace.append(assemblies.pop())
+      except IndexError:
+        break
+    if assemblies:
+      self.push_to_fifo(assemblies)
+  
   def update_workspace(self,new_assemblies):
-    if len(self.workspace) < self.max_workspace_size:
-      while len(self.workspace) < self.max_workspace_size:
-        try:
-          self.workspace.append(new_assemblies.pop(0))
-        except IndexError:
-          break
-    if new_assemblies:
-      self.push_to_fifo(new_assemblies)
+    self.load_assemblies_into_workspace(new_assemblies)
   
   def finalize_workspace(self):
     self.top_off_workspace()
