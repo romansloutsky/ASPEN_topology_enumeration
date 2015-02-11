@@ -795,25 +795,25 @@ class CladeReprTracker(object):
 
 
 class AssemblyWorkspace(object):
-  def __init__(self,pwleafdist_histograms,constraint_freq_cutoff,leaves_to_assemble,
-               absolute_freq_cutoff=0.01,num_requested_trees=1000,max_workspace_size=10000,
-               fifo=None,keep_alive_when_pickling=True):
-    self.workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
-                                   leaves_to_assemble,absolute_freq_cutoff,
-                                   keep_alive_when_pickling=keep_alive_when_pickling)]
+  def __init__(self,seed_assembly,num_requested_trees,max_workspace_size,
+                    encountered_assemblies_storage,fifo=None,
+                    track_min_score=True):
+    if isinstance(seed_assembly,list):
+      seed_assembly = TreeAssembly(*seed_assembly)
+    self.workspace = [seed_assembly]
     self.accepted_assemblies = []
     self.rejected_assemblies = []
-    self.encountered_assemblies = CladeReprTracker(leaves_to_assemble)
+    self.encountered_assemblies = encountered_assemblies_storage
     
+    self.num_leaves = len(seed_assembly.leaves_master)
     self.num_requested_trees = num_requested_trees
     self.reached_num_requested_trees = False
-    self.curr_min_score = None
-    
-    self.iternum = 0
-    
+    if track_min_score:
+      self.curr_min_score = None
     self.max_workspace_size = max_workspace_size
-    
     self.fifo = fifo
+    
+    self.iternum = 1
   
   def top_off_workspace(self):
     if self.fifo is None or isinstance(self.fifo,str):
@@ -1024,25 +1024,16 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   
   def __init__(self,fifo,queue,min_score,shared_encountered_assemblies_dict,
                score_submission_queue,leaves_to_assemble,seed_assembly,
-               num_requested_trees=1000,max_workspace_size=1000):
-    self.workspace = [seed_assembly]
+               num_requested_trees,max_workspace_size):
+    encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
+                                            shared_encountered_assemblies_dict)
+    AssemblyWorkspace.__init__(self,seed_assembly,num_requested_trees,
+                                    max_workspace_size,encountered_assemblies,
+                                    fifo,track_min_score=False)
     
-    self.accepted_assemblies = []
-    self.score_submission_queue = score_submission_queue
-    self.rejected_assemblies = []
-    self.encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
-                                                shared_encountered_assemblies_dict)
-    
-    self.num_requested_trees = num_requested_trees
-    self.reached_num_requested_trees = False
     self._curr_min_score = min_score
-    
-    self.iternum = 0
-    
-    self.max_workspace_size = max_workspace_size
-    
-    self.fifo = fifo
     self.queue = queue
+    self.score_submission_queue = score_submission_queue
 
   @property
   def curr_min_score(self):
