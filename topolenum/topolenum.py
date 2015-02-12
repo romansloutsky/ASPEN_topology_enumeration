@@ -815,11 +815,14 @@ class AssemblyWorkspace(object):
     
     self.iternum = 1
   
+  def check_if_num_requested_trees_reached(self):
+    return len(self.accepted_assemblies) >= self.num_requested_trees
+  
   @property
   def reached_num_requested_trees(self):
     if self._reached_num_requested_trees:
       return True
-    elif len(self.accepted_assemblies) >= self.num_requested_trees:
+    elif self.check_if_num_requested_trees_reached():
       self._reached_num_requested_trees = True
       return True
     else:
@@ -1048,6 +1051,11 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self._curr_min_score = min_score
     self.queue = queue
     self.score_submission_queue = score_submission_queue
+  
+  def check_if_num_requested_trees_reached(self):
+    # Multiply initial value by 0.9, because who knows if the comparison
+    # -sys.float_info.max > -sys.float_info.max may sometimes return true?
+    return self._curr_min_score.value > -sys.float_info.max*0.9
 
   @property
   def curr_min_score(self):
