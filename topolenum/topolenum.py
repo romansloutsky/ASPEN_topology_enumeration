@@ -807,13 +807,23 @@ class AssemblyWorkspace(object):
     
     self.num_leaves = len(seed_assembly.leaves_master)
     self.num_requested_trees = num_requested_trees
-    self.reached_num_requested_trees = False
+    self._reached_num_requested_trees = False
     if track_min_score:
       self.curr_min_score = None
     self.max_workspace_size = max_workspace_size
     self.fifo = fifo
     
     self.iternum = 1
+  
+  @property
+  def reached_num_requested_trees(self):
+    if self._reached_num_requested_trees:
+      return True
+    elif len(self.accepted_assemblies) >= self.num_requested_trees:
+      self._reached_num_requested_trees = True
+      return True
+    else:
+      return False
   
   def apply_acceptance_logic_to_popped_assembly(self,popped):
     if popped.score > self.curr_min_score:
@@ -857,8 +867,8 @@ class AssemblyWorkspace(object):
   
   def check_completion_status(self,assembly):
     if assembly.complete:
-      if len(self.accepted_assemblies) < self.num_requested_trees\
-                                      or assembly.score > self.curr_min_score:
+      if not self.reached_num_requested_trees\
+                                       or assembly.score > self.curr_min_score:
         self.accepted_assemblies.append(assembly)
         self.accepted_assemblies.sort(key=lambda x: x.score,reverse=True)
         while len(self.accepted_assemblies) > self.num_requested_trees:
@@ -889,10 +899,6 @@ class AssemblyWorkspace(object):
                              if self.check_completion_status(asbly) is not None])
     for i in drop_from_workspace_idx[::-1]:
       self.workspace.pop(i)
-    if not self.reached_num_requested_trees:
-      if len(self.accepted_assemblies) == self.num_requested_trees:
-        self.workspace = [asbly for asbly in self.workspace if asbly.score > self.curr_min_score]
-        self.reached_num_requested_trees = True
     self.finalize_workspace()
     self.iternum += 1
 
