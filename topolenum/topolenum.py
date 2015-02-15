@@ -828,11 +828,16 @@ class AssemblyWorkspace(object):
     else:
       return False
   
-  def apply_acceptance_logic_to_popped_assembly(self,popped):
+  def apply_acceptance_logic_to_popped_assembly(self,popped,min_leaf_count,
+                                                     rejected_assemblies):
     if popped.score > self.curr_min_score:
-      self.workspace.append(popped)
+      if sum(c.count_terminals() for c in popped.built_clades) >= min_leaf_count:
+        self.workspace.append(popped)
+      else:
+        rejected_assemblies.append(popped)
   
-  def fill_workspace_from_fifo(self,max_size):
+  def fill_workspace_from_fifo(self,max_size,min_leaf_count,
+                                    rejected_assemblies):
     if self.fifo is None or isinstance(self.fifo,str):
       return
     else:
@@ -841,11 +846,15 @@ class AssemblyWorkspace(object):
         if popped is None:
           break
         else:
-          self.apply_acceptance_logic_to_popped_assembly(popped)
+          self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
+                                                         rejected_assemblies)
   
-  def top_off_workspace(self,max_size=None):
+  def top_off_workspace(self,max_size=None,min_leaf_count=None):
     max_size = max_size or self.max_workspace_size
-    self.fill_workspace_from_fifo(max_size)
+    min_leaf_count = min_leaf_count or 0
+    rejected = []
+    self.fill_workspace_from_fifo(max_size,min_leaf_count,rejected)
+    self.push_to_fifo(rejected)
   
   def push_to_fifo(self,push_these):
     if self.fifo is None:
@@ -1065,7 +1074,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def curr_min_score(self):
     return self._curr_min_score.value
   
-  def fill_workspace_from_fifo(self,max_size):
+  def fill_workspace_from_fifo(self,max_size,min_leaf_count,
+                                    rejected_assemblies):
     while len(self.workspace) < max_size:
       try:
         pickled_assembly = self.queue.get_nowait()
@@ -1081,7 +1091,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
             else:
               continue
       popped = pickle.loads(pickled_assembly)
-      self.apply_acceptance_logic_to_popped_assembly(popped)
+      self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
+                                                     rejected_assemblies)
   
   def push_to_fifo(self,push_these):
     self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
