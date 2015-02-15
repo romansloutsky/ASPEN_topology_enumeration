@@ -832,19 +832,20 @@ class AssemblyWorkspace(object):
     if popped.score > self.curr_min_score:
       self.workspace.append(popped)
   
-  def fill_workspace_from_fifo(self):
+  def fill_workspace_from_fifo(self,max_size):
     if self.fifo is None or isinstance(self.fifo,str):
       return
     else:
-      while len(self.workspace) < self.max_workspace_size:
+      while len(self.workspace) < max_size:
         popped = self.fifo.pop()
         if popped is None:
           break
         else:
           self.apply_acceptance_logic_to_popped_assembly(popped)
   
-  def top_off_workspace(self):
-    self.fill_workspace_from_fifo()
+  def top_off_workspace(self,max_size=None):
+    max_size = max_size or self.max_workspace_size
+    self.fill_workspace_from_fifo(max_size)
   
   def push_to_fifo(self,push_these):
     if self.fifo is None:
@@ -1064,8 +1065,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def curr_min_score(self):
     return self._curr_min_score.value
   
-  def fill_workspace_from_fifo(self):
-    while len(self.workspace) < self.max_workspace_size:
+  def fill_workspace_from_fifo(self,max_size):
+    while len(self.workspace) < max_size:
       try:
         pickled_assembly = self.queue.get_nowait()
       except Queue.Empty:
