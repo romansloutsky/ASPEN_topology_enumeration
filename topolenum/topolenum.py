@@ -864,6 +864,14 @@ class AssemblyWorkspace(object):
     for item in push_these:
       self.fifo.push(item)
   
+  def assembly_stats(self,assemblies=None):
+    if assemblies is None:
+      assemblies = self.workspace
+    leafcounts = [sum(c.count_terminals() for c in a.built_clades)
+                  for a in assemblies]
+    ratios = [a.score/count for a,count in zip(assemblies,leafcounts)]
+    return leafcounts,ratios
+  
   def load_assemblies_into_workspace(self,assemblies,max_size=None):
     if max_size is None:
       max_size = self.max_workspace_size
@@ -879,7 +887,31 @@ class AssemblyWorkspace(object):
     self.load_assemblies_into_workspace(new_assemblies)
   
   def finalize_workspace(self):
-    self.top_off_workspace()
+    if not self.reached_num_requested_trees:
+      # Try to finish assembly of the requested number of trees ASAP:
+      # Work only a limited number of the most promising assemblies, assessed
+      # by ratio of score to number of leaves attached to all built clades
+      # (i.e. the average score contribution of each attached leaf)
+      leafcounts,ratios = self.assembly_stats()
+      self.workspace = [a for r,a in sorted(zip(ratios,self.workspace),
+                                            reverse=True)]
+      # If assembly is in early stages (fewer than half of all leaves have been
+      # attached to any of the assemblies in the workspace), keep the workspace
+      # really small (10), since each assembly will likely give rise to many
+      # complete trees. Otherwise keep the workspace moderately small (100).
+      # Of course, if the requested max_workspace_size is smaller than either
+      # value, use the requested size instead of that value.
+      current_max = 10 if max(leafcounts) < self.num_leaves*0.5 else 100
+      # Put remaining assemblies into the FIFO to deal with later
+      sock_away = []
+      while len(self.workspace) > min(self.max_workspace_size,current_max):
+        sock_away.append(self.workspace.pop())
+      if sock_away:
+        self.push_to_fifo(sock_away)
+      elif len(self.workspace) < min(self.max_workspace_size,current_max):
+        self.top_off_workspace(min(self.max_workspace_size,current_max))
+    else:
+      self.top_off_workspace()
   
   def check_completion_status(self,assembly):
     if assembly.complete:
