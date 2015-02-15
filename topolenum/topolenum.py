@@ -884,7 +884,39 @@ class AssemblyWorkspace(object):
       self.push_to_fifo(assemblies)
   
   def update_workspace(self,new_assemblies):
-    self.load_assemblies_into_workspace(new_assemblies)
+    if not self.reached_num_requested_trees and new_assemblies:
+      # Until requested number of trees have been completed, only keep some of
+      # the new assemblies - the ones with the highest score/leaves ratio
+      leafcounts,ratios = self.assembly_stats(new_assemblies)
+      if self.iternum == 1:
+        # On first iteration seed the workspace with 9 best assemblies,
+        # in addition to the one that got extended in place, for a total of 10.
+        self.load_assemblies_into_workspace(
+                             [a for r,a in sorted(zip(ratios,new_assemblies))],
+                                            min(self.max_workspace_size,9))
+      elif max(leafcounts) < self.num_leaves*0.5:
+        # If past the first assembly, but still early on (fewer than half of
+        # all leaves have been attached to any of the assemblies in the
+        # workspace), put only the best new assembly in the workspace and the
+        # rest in the FIFO. In addition to the one that was extended in place,
+        # this will add one new assembly to the workspace, doubling the
+        # workspace over the course of the iteration. If leafcounts are still
+        # less than half of all leaves for all assemblies in the workspace at
+        # the end of the iteration, the workspace will be reduced to the 10
+        # best assemblies.
+        self.workspace.append(new_assemblies.pop(max(((i,r) for i,r in
+                                                      enumerate(ratios)),
+                                                     key=lambda (i,r): r)[0]))
+        self.push_to_fifo(new_assemblies)
+      else:
+        # If requested number of trees has not been reached, but not the first
+        # iteration and at least one new assembly has more than half of all
+        # leaves attached, put them all in the workspace until it reaches 100.
+        self.load_assemblies_into_workspace(new_assemblies,
+                                            min(self.max_workspace_size,100))
+    elif new_assemblies:
+      # Otherwise fill workspace to max_workspace_size
+      self.load_assemblies_into_workspace(new_assemblies)
   
   def finalize_workspace(self):
     if not self.reached_num_requested_trees:
