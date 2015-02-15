@@ -814,6 +814,8 @@ class AssemblyWorkspace(object):
     self.fifo = fifo
     
     self.iternum = 1
+    self.topoff_param1 = 1
+    self.topoff_param2 = 1
   
   def check_if_num_requested_trees_reached(self):
     return len(self.accepted_assemblies) >= self.num_requested_trees
@@ -943,7 +945,21 @@ class AssemblyWorkspace(object):
       elif len(self.workspace) < min(self.max_workspace_size,current_max):
         self.top_off_workspace(min(self.max_workspace_size,current_max))
     else:
-      self.top_off_workspace()
+      if not self.workspace:
+        self.top_off_workspace(max_size=min(self.max_workspace_size,max(10,
+                               self.max_workspace_size/(50*max(0.02,
+                                                            (self.topoff_param1/
+                                                            self.topoff_param2)
+                                                               )
+                                                            )
+                                                                        )
+                                            )
+                               )
+        self.topoff_param1 = 1.0
+        self.topoff_param2 += 5.0
+      else:
+        self.topoff_param1 += 1.0
+        self.topoff_param2 = max(1.0,self.topoff_param2 - 1.0)
   
   def check_completion_status(self,assembly):
     if assembly.complete:
