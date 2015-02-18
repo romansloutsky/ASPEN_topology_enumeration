@@ -896,7 +896,7 @@ class AssemblyWorkspace(object):
         self.load_assemblies_into_workspace(
                              [a for r,a in sorted(zip(ratios,new_assemblies))],
                                             min(self.max_workspace_size,10))
-      elif max(leafcounts) < self.num_leaves*0.5:
+      elif min(leafcounts) < self.num_leaves*0.8:
         # If past the first assembly, but still early on (fewer than half of
         # all leaves have been attached to any of the assemblies in the
         # workspace), put only the best new assembly in the workspace and the
@@ -936,7 +936,7 @@ class AssemblyWorkspace(object):
         # complete trees. Otherwise keep the workspace moderately small (100).
         # Of course, if the requested max_workspace_size is smaller than either
         # value, use the requested size instead of that value.
-        current_max = 10 if max(leafcounts) < self.num_leaves*0.5 else 100
+        current_max = 10 if min(leafcounts) < self.num_leaves*0.8 else 100
         # Put remaining assemblies into the FIFO to deal with later
         sock_away = []
         while len(self.workspace) > min(self.max_workspace_size,current_max):
