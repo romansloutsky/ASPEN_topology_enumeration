@@ -922,28 +922,31 @@ class AssemblyWorkspace(object):
   
   def finalize_workspace(self):
     if not self.reached_num_requested_trees:
-      # Try to finish assembly of the requested number of trees ASAP:
-      # Work only a limited number of the most promising assemblies, assessed
-      # by ratio of score to number of leaves attached to all built clades
-      # (i.e. the average score contribution of each attached leaf)
-      leafcounts,ratios = self.assembly_stats()
-      self.workspace = [a for r,a in sorted(zip(ratios,self.workspace),
-                                            reverse=True)]
-      # If assembly is in early stages (fewer than half of all leaves have been
-      # attached to any of the assemblies in the workspace), keep the workspace
-      # really small (10), since each assembly will likely give rise to many
-      # complete trees. Otherwise keep the workspace moderately small (100).
-      # Of course, if the requested max_workspace_size is smaller than either
-      # value, use the requested size instead of that value.
-      current_max = 10 if max(leafcounts) < self.num_leaves*0.5 else 100
-      # Put remaining assemblies into the FIFO to deal with later
-      sock_away = []
-      while len(self.workspace) > min(self.max_workspace_size,current_max):
-        sock_away.append(self.workspace.pop())
-      if sock_away:
-        self.push_to_fifo(sock_away)
-      elif len(self.workspace) < min(self.max_workspace_size,current_max):
-        self.top_off_workspace(min(self.max_workspace_size,current_max))
+      if self.workspace:
+        # Try to finish assembly of the requested number of trees ASAP:
+        # Work only a limited number of the most promising assemblies, assessed
+        # by ratio of score to number of leaves attached to all built clades
+        # (i.e. the average score contribution of each attached leaf)
+        leafcounts,ratios = self.assembly_stats()
+        self.workspace = [a for r,a in sorted(zip(ratios,self.workspace),
+                                              reverse=True)]
+        # If assembly is in early stages (fewer than half of all leaves have been
+        # attached to any of the assemblies in the workspace), keep the workspace
+        # really small (10), since each assembly will likely give rise to many
+        # complete trees. Otherwise keep the workspace moderately small (100).
+        # Of course, if the requested max_workspace_size is smaller than either
+        # value, use the requested size instead of that value.
+        current_max = 10 if max(leafcounts) < self.num_leaves*0.5 else 100
+        # Put remaining assemblies into the FIFO to deal with later
+        sock_away = []
+        while len(self.workspace) > min(self.max_workspace_size,current_max):
+          sock_away.append(self.workspace.pop())
+        if sock_away:
+          self.push_to_fifo(sock_away)
+        elif len(self.workspace) < min(self.max_workspace_size,current_max):
+          self.top_off_workspace(min(self.max_workspace_size,current_max))
+      else:
+        self.top_off_workspace(10)
     else:
       if not self.workspace:
         self.top_off_workspace(max_size=min(self.max_workspace_size,max(10,
