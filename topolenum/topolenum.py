@@ -862,6 +862,8 @@ class AssemblyWorkspace(object):
       rejected = []
       self.fill_workspace_from_fifo(max_size,min_leaf_count,rejected,counter)
       self.push_to_fifo(rejected)
+      if counter[0] < 100:
+        break
   
   def push_to_fifo(self,push_these):
     if self.fifo is None:
