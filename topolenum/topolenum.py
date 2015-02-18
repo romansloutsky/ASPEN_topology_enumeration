@@ -10,7 +10,7 @@ import Queue
 import gc
 import cPickle as pickle
 from sys import stderr
-from collections import defaultdict,namedtuple,Counter
+from collections import defaultdict,namedtuple,Counter,Hashable
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tempdir import TemporaryDirectory
 from .tree import T as T_BASE
@@ -317,6 +317,18 @@ class TreeAssembly(object):
                       self.constraints_master[i].leaves & l_accounted_for][::-1]
     for i in drop_these_idx:
       self.constraints_idx.pop(i)
+  
+  def convert_containers(self,convert_this,container_type=None):
+    result = []
+    for member in convert_this:
+      if isinstance(member,Hashable) and member in self.leaves_master:
+        result.append(member)
+      else:
+        result.append(self.convert_containers(member,container_type))
+    if container_type is not None:
+      return container_type(result)
+    else:
+      return result
   
   def __getstate__(self):
     state = {'score':self.score}
