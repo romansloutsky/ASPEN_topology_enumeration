@@ -840,18 +840,17 @@ class AssemblyWorkspace(object):
   
   def fill_workspace_from_fifo(self,max_size,min_leaf_count,
                                     rejected_assemblies):
-    if self.fifo is None or isinstance(self.fifo,str):
-      return
-    else:
-      while len(self.workspace) < max_size:
-        popped = self.fifo.pop()
-        if popped is None:
-          break
-        else:
-          self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
-                                                         rejected_assemblies)
+    while len(self.workspace) < max_size:
+      popped = self.fifo.pop()
+      if popped is None:
+        break
+      else:
+        self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
+                                                       rejected_assemblies)
   
   def top_off_workspace(self,max_size=None,min_leaf_count=None):
+    if self.fifo is None or isinstance(self.fifo,str):
+      return
     max_size = max_size or self.max_workspace_size
     min_leaf_count = min_leaf_count or 0
     rejected = []
