@@ -10,6 +10,7 @@ import Queue
 import gc
 import cPickle as pickle
 from sys import stderr
+from cStringIO import StringIO
 from collections import defaultdict,namedtuple,Counter,Hashable
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tempdir import TemporaryDirectory
@@ -291,6 +292,9 @@ class TreeAssembly(object):
     # More technically mutable variables that should not be changed by instances
     type(self).abs_cutoff = absolute_freq_cutoff
     type(self).leaves_master = set(leaves_to_assemble)
+    type(self).pickle_encoding = {chr(i):t for i,t in enumerate('[],;')}
+    type(self).pickle_encoding.update({chr(i+4):repr(l) for i,l in
+                                       enumerate(type(self).leaves_master)})
     type(self).keep_alive = keep_alive_when_pickling
     
     #===========================================================================
@@ -336,9 +340,24 @@ class TreeAssembly(object):
       state['built_clades'] = [c.check_in_pickle() for c in self.built_clades]
     else:
       state['built_clades'] = [T._nsrepr(c) for c in self.built_clades]
+    state['built_clades'] = ';'.join(''.join(repr(
+                                          self.convert_containers(c)).split())
+                                     for c in state['built_clades'])
+    for k,v in self.pickle_encoding.items():
+      state['built_clades'] = state['built_clades'].replace(v,k)
     return state
   
   def __setstate__(self,state):
+    s = StringIO(state['built_clades'])
+    clades = []
+    while True:
+      read_byte = s.read(1)
+      if not read_byte:
+        break
+      else:
+        clades.append(self.pickle_encoding[read_byte])
+    state['built_clades'] = [self.convert_containers(eval(m),frozenset)
+                             for m in ''.join(clades).split(';')]
     for k,v in state.items():
       if k != 'built_clades':
         self.__dict__[k] = v
