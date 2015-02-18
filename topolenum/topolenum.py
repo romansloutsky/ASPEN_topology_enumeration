@@ -895,7 +895,7 @@ class AssemblyWorkspace(object):
         # in addition to the one that got extended in place, for a total of 10.
         self.load_assemblies_into_workspace(
                              [a for r,a in sorted(zip(ratios,new_assemblies))],
-                                            min(self.max_workspace_size,9))
+                                            min(self.max_workspace_size,10))
       elif max(leafcounts) < self.num_leaves*0.5:
         # If past the first assembly, but still early on (fewer than half of
         # all leaves have been attached to any of the assemblies in the
