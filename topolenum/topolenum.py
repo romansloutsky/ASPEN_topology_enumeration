@@ -944,7 +944,8 @@ class AssemblyWorkspace(object):
         if sock_away:
           self.push_to_fifo(sock_away)
         elif len(self.workspace) < min(self.max_workspace_size,current_max):
-          self.top_off_workspace(min(self.max_workspace_size,current_max))
+          self.top_off_workspace(min(self.max_workspace_size,current_max),
+                                 self.num_leaves*0.8)
       else:
         self.top_off_workspace(10)
     else:
