@@ -890,6 +890,7 @@ class AssemblyWorkspace(object):
       if popped is None:
         break
       else:
+        popped = TreeAssembly.uncompress(popped)
         self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
                                                        rejected_assemblies,
                                                        counter)
