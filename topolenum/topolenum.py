@@ -345,10 +345,10 @@ class TreeAssembly(object):
                                      for c in state['built_clades'])
     for k,v in self.pickle_encoding.items():
       state['built_clades'] = state['built_clades'].replace(v,k)
-    return state
+    return state['built_clades'],state['score']
   
   def __setstate__(self,state):
-    s = StringIO(state['built_clades'])
+    s = StringIO(state[0])
     clades = []
     while True:
       read_byte = s.read(1)
@@ -356,8 +356,9 @@ class TreeAssembly(object):
         break
       else:
         clades.append(self.pickle_encoding[read_byte])
-    state['built_clades'] = [self.convert_containers(eval(m),frozenset)
-                             for m in ''.join(clades).split(';')]
+    state = {'score':state[1],
+             'built_clades':[self.convert_containers(eval(m),frozenset)
+                             for m in ''.join(clades).split(';')]}
     for k,v in state.items():
       if k != 'built_clades':
         self.__dict__[k] = v
@@ -371,6 +372,16 @@ class TreeAssembly(object):
                           set.union(*[set(leafset) for leafset in
                                                      self.pairs_accounted_for])
     self.rebuild_constraints_idx()
+  
+  def compress(self):
+    return pickle.dumps(self.__getstate__(),pickle.HIGHEST_PROTOCOL)
+  
+  @classmethod
+  def uncompress(cls,compressed):
+    state = pickle.loads(compressed)
+    obj = cls.__new__(cls)
+    obj.__setstate__(state)
+    return obj
   
   def copy(self):
     copy_of_self = type(self).__new__(type(self))
@@ -902,7 +913,7 @@ class AssemblyWorkspace(object):
     elif isinstance(self.fifo,str):
       self.fifo = FIFOfile(name=self.fifo)
     for item in push_these:
-      self.fifo.push(item)
+      self.fifo.push(item.compress())
   
   def assembly_stats(self,assemblies=None):
     if assemblies is None:
@@ -1212,14 +1223,13 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
               raise self.AssemblyWorkFinished
             else:
               continue
-      popped = pickle.loads(pickled_assembly)
+      popped = TreeAssembly.uncompress(pickled_assembly)
       self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
                                                      rejected_assemblies,
                                                      counter)
   
   def push_to_fifo(self,push_these):
-    self.fifo.push_all(pickle.dumps(item,pickle.HIGHEST_PROTOCOL)
-                       for item in push_these)
+    self.fifo.push_all(item.compress() for item in push_these)
   
   def check_completion_status(self,assembly):
     if assembly.complete:
@@ -1399,8 +1409,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                                 self.results_queue,self.fifo_max_file_size)
                for i in xrange(self.num_workers)]
       while seed_assemblies:
-        self.assembly_queue.put(pickle.dumps(seed_assemblies.pop(),
-                                             pickle.HIGHEST_PROTOCOL))
+        self.assembly_queue.put(seed_assemblies.pop().compress())
       for p in procs:
         p.start()
         self.send_PIDs.send((p.pid,p.name))
