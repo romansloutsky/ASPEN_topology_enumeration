@@ -1382,6 +1382,7 @@ class AssemblerProcess(multiprocessing.Process):
             break
           else:
             continue
+      self.assemblies.monitor.close()
       self.close_fifo.set()
       self.fifo.close()
       self.queue_loader_p.join(timeout=15)
