@@ -1215,6 +1215,12 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     return self._curr_min_score.value > -sys.float_info.max*0.9
 
   @property
+  def complete_trees_fh(self):
+    if not hasattr(self,'_complete_trees_fh'):
+      self._complete_trees_fh = open(multiprocessing.current_process().name+'_complete_trees','w')
+    return self._complete_trees_fh
+
+  @property
   def curr_min_score(self):
     return self._curr_min_score.value
   
@@ -1274,6 +1280,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
         self.log("CompleteAccepted "+str(assembly.score),assembly)
         self.score_submission_queue.put(assembly.score)
         self.accepted_assemblies.append(assembly)
+        self.complete_trees_fh.write(str(assembly.score)+'\t'+assembly.built_clades[0].write('as_string','newick',plain=True))
       else:
         self.log("CompleteRejected "+str(assembly.score),assembly)
         self.rejected_assemblies.append(assembly)
@@ -1383,6 +1390,7 @@ class AssemblerProcess(multiprocessing.Process):
           else:
             continue
       self.assemblies.monitor.close()
+      self.assemblies.complete_trees_fh.close()
       self.close_fifo.set()
       self.fifo.close()
       self.queue_loader_p.join(timeout=15)
