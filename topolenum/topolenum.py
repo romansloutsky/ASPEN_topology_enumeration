@@ -1,4 +1,5 @@
 import sys
+import time
 import os.path
 import math
 import itertools
@@ -877,10 +878,14 @@ class AssemblyWorkspace(object):
                                                      counter):
     if popped.score > self.curr_min_score:
       if sum(c.count_terminals() for c in popped.built_clades) >= min_leaf_count:
+        self.log("TopoffAccepted "+str(popped.score),popped)
         self.workspace.append(popped)
       else:
+        self.log("TopoffPostponed "+str(popped.score),popped)
         counter[0] += 1
         rejected_assemblies.append(popped)
+    else:
+      self.log("TopoffRejected "+str(popped.score),popped)
   
   def fill_workspace_from_fifo(self,max_size,min_leaf_count,
                                     rejected_assemblies,
@@ -1025,6 +1030,7 @@ class AssemblyWorkspace(object):
           self.rejected_assemblies.append(self.accepted_assemblies.pop())
         self.curr_min_score = self.accepted_assemblies[-1].score
       else:
+        self.log("CompleteRejected "+str(assembly.score),assembly)
         self.rejected_assemblies.append(assembly)
       return
     else:
@@ -1036,6 +1042,7 @@ class AssemblyWorkspace(object):
     for i,assembly in enumerate(workspace_this_iter):
       if interrupt_callable():
         return
+      self.log("WorkingOn "+str(assembly.score),assembly)
       extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
                                                          self.curr_min_score)
       if extended_assemblies is None:
@@ -1187,7 +1194,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     pass
   
   def __init__(self,fifo,queue,min_score,shared_encountered_assemblies_dict,
-               score_submission_queue,leaves_to_assemble,seed_assembly,
+               score_submission_queue,start_time_val,leaves_to_assemble,seed_assembly,
                num_requested_trees,max_workspace_size):
     encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
                                             shared_encountered_assemblies_dict)
@@ -1198,6 +1205,9 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self._curr_min_score = min_score
     self.queue = queue
     self.score_submission_queue = score_submission_queue
+    
+    self.start_time = start_time_val
+    self.monitor = open(multiprocessing.current_process().name+'_activity_dump','w',0)
   
   def check_if_num_requested_trees_reached(self):
     # Multiply initial value by 0.9, because who knows if the comparison
@@ -1207,6 +1217,30 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   @property
   def curr_min_score(self):
     return self._curr_min_score.value
+  
+  @property
+  def time_stamp(self):
+    return "%0.5f" % (time.time()-self.start_time.value)
+  
+  def log(self,message,assembly=None,proc_stamp=True):
+    currscore = self.curr_min_score
+    currscore = 'min_score='+repr(None) if currscore == -sys.float_info.max\
+                                           else "min_score=%0.5f" % currscore
+    iternum = "iter="+str(self.iternum)
+    if proc_stamp:
+      stamp = 'STAMP: '+' '.join([multiprocessing.current_process().name,
+                                  'time='+self.time_stamp,
+                                  currscore,iternum])+'   '
+    else:
+      stamp = 'STAMP: '+' '.join(['time='+self.time_stamp,
+                                  currscore,iternum])+'   '
+    if assembly is None:
+      print >>self.monitor,stamp,message
+    else:
+      print >>self.monitor,stamp,message,self.encountered_assemblies.make_str_repr(
+                                            assembly.current_clades_as_nested_sets),'\t',\
+                                            len(assembly.built_clades),'\t',\
+                                            len(assembly.leaves_master)-len(assembly.free_leaves)
   
   def fill_workspace_from_fifo(self,max_size,min_leaf_count,
                                     rejected_assemblies,counter):
@@ -1230,28 +1264,42 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
                                                      counter)
   
   def push_to_fifo(self,push_these):
+    for item in push_these:
+      self.log("Pushing "+str(item.score),item)
     self.fifo.push_all(item.compress() for item in push_these)
   
   def check_completion_status(self,assembly):
     if assembly.complete:
       if assembly.score > self.curr_min_score:
+        self.log("CompleteAccepted "+str(assembly.score),assembly)
         self.score_submission_queue.put(assembly.score)
         self.accepted_assemblies.append(assembly)
       else:
+        self.log("CompleteRejected "+str(assembly.score),assembly)
         self.rejected_assemblies.append(assembly)
       for i in xrange(len(self.accepted_assemblies)-1,-1,-1):
         if self.accepted_assemblies[i].score < self.curr_min_score:
           self.rejected_assemblies.append(self.accepted_assemblies.pop(i))
       return
     else:
+      self.log("Extended "+str(assembly.score),assembly)
       return assembly
   
   def iterate(self,*args,**kwargs):
     try:
+      print >>self.monitor,'-'*80
+      print >>self.monitor,"START OF ITERATION",self.iternum,
+      print >>self.monitor,"\tworkspace size:",len(self.workspace),
+      print >>self.monitor,"\ttime:",self.time_stamp
       AssemblyWorkspace.iterate(self,*args,**kwargs)
     except self.AssemblyWorkFinished:
+      print >>self.monitor,"Caught 'FINISHED' signal"
       return 'FINISHED'
     finally:
+      print >>self.monitor,"END OF ITERATION",self.iternum-1,
+      print >>self.monitor,"\tworkspace size:",len(self.workspace),
+      print >>self.monitor,"\ttime:",self.time_stamp
+      print >>self.monitor,'-'*80
       gc.collect()
 
 
@@ -1288,7 +1336,7 @@ class AssemblerProcess(multiprocessing.Process):
     return multiprocessing.Process.__new__(cls,*args,**kwargs)
   
   def __init__(self,queue,shared_encountered_assemblies_dict,shared_min_score,
-                    score_submission_queue,seed_assembly,pass_to_workspace,
+                    score_submission_queue,seed_assembly,pass_to_workspace,start_time_val,
                     results_queue,fifo_max_file_size=1.0):
     multiprocessing.Process.__init__(self,name='AssemblerProcess-'\
                                                           +str(self.instcount))
@@ -1300,6 +1348,8 @@ class AssemblerProcess(multiprocessing.Process):
     self.pass_to_workspace = pass_to_workspace
     self.seed_assembly = seed_assembly
     self.fifo_max_file_size = fifo_max_file_size
+    
+    self.start_time = start_time_val
     
     self.close_fifo = multiprocessing.Event()
     
@@ -1314,6 +1364,7 @@ class AssemblerProcess(multiprocessing.Process):
     self.assemblies = WorkerProcAssemblyWorkspace(self.fifo,self.queue,self.min_score,
                                                   self.encountered_assemblies_dict,
                                                   self.score_submission_queue,
+                                                  self.start_time,
                                                   *self.pass_to_workspace.args,
                                                   **self.pass_to_workspace.kwargs)
     self.queue_loader_p = QueueLoader(self.fifo,self.close_fifo,self.queue)
@@ -1364,6 +1415,8 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.finished = multiprocessing.Event()
     self.shutdown = multiprocessing.Event()
     
+    self.start_time = multiprocessing.Value('d',time.time())
+    
     self.histograms = leafdist_histograms
     self.leaves = leaves_to_assemble
     self.constraint_freq_cutoff = constraint_freq_cutoff
@@ -1406,7 +1459,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
       procs = [AssemblerProcess(self.assembly_queue,
                                 self.encountered_assemblies_dict,
                                 self.min_score,self.scores_queue,
-                                seed_assemblies.pop(),workspace_args,
+                                seed_assemblies.pop(),workspace_args,self.start_time,
                                 self.results_queue,self.fifo_max_file_size)
                for i in xrange(self.num_workers)]
       while seed_assemblies:
