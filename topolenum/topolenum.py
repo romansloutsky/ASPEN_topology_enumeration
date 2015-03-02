@@ -1162,6 +1162,7 @@ class SharedFIFOfile(FIFOfile):
       self.shutdown_baton.release()
     else:
       self.current_writing_file.close()
+      self.set() # Free QueueLoader proc from wait in pop() so it can shut down
       self.shutdown_baton.wait(30)
       self.tmpdir_obj.__exit__(None,None,None)
       self.TMPFILE.writing_side_conn.close()
