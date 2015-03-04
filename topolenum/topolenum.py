@@ -374,11 +374,10 @@ class TreeAssembly(object):
     self.rebuild_constraints_idx()
   
   def compress(self):
-    return pickle.dumps(self.__getstate__(),pickle.HIGHEST_PROTOCOL)
+    return self.__getstate__()
   
   @classmethod
-  def uncompress(cls,compressed):
-    state = pickle.loads(compressed)
+  def uncompress(cls,state):
     obj = cls.__new__(cls)
     obj.__setstate__(state)
     return obj
