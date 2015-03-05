@@ -345,7 +345,7 @@ class TreeAssembly(object):
                                      for c in state['built_clades'])
     for k,v in self.pickle_encoding.items():
       state['built_clades'] = state['built_clades'].replace(v,k)
-    return state['built_clades'],state['score']
+    return state['built_clades'],state['score'],len(self.pairs_accounted_for)
   
   def __setstate__(self,state):
     s = StringIO(state[0])
@@ -899,12 +899,12 @@ class AssemblyWorkspace(object):
   def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
                                                      counter):
-    if popped.score > self.curr_min_score:
+    if popped[1] > self.curr_min_score:
       self.topoff_count += 1
       # Check assemblies extension prospects here - no need to try extending it
       # if they are bad
-      if len(popped.pairs_accounted_for) >= self.acceptance_criterion:
-        self.workspace.append(popped)
+      if popped[2] >= self.acceptance_criterion:
+        self.workspace.append(TreeAssembly.uncompress(popped))
       else:
         counter[0] += 1
         rejected_assemblies.append(popped)
@@ -915,7 +915,6 @@ class AssemblyWorkspace(object):
       if popped is None:
         break
       else:
-        popped = TreeAssembly.uncompress(popped)
         self.apply_acceptance_logic_to_popped_assembly(popped,
                                                        rejected_assemblies,
                                                        counter)
@@ -938,14 +937,14 @@ class AssemblyWorkspace(object):
     elif isinstance(self.fifo,str):
       self.fifo = FIFOfile(name=self.fifo)
     for item in push_these:
-      self.fifo.push(item.compress())
+      self.fifo.push(item)
   
   def purge_push_cache(self):
     self.push_to_fifo(self.push_cache)
     self.push_cache = []
   
   def push(self,*args):
-    self.push_cache.extend(args)
+    self.push_cache.extend(item.compress() for item in args)
     if len(self.push_cache) > 100:
       self.purge_push_cache()
     self.push_count += len(args)
@@ -1218,13 +1217,12 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
               raise self.AssemblyWorkFinished
             else:
               continue
-      popped = TreeAssembly.uncompress(pickled_assembly)
-      self.apply_acceptance_logic_to_popped_assembly(popped,
+      self.apply_acceptance_logic_to_popped_assembly(pickled_assembly,
                                                      rejected_assemblies,
                                                      counter)
   
   def push_to_fifo(self,push_these):
-    self.fifo.push_all(item.compress() for item in push_these)
+    self.fifo.push_all(item for item in push_these)
   
   def check_completion_status(self,assembly):
     if assembly.complete:
