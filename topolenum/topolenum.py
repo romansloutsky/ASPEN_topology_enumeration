@@ -1024,17 +1024,23 @@ class AssemblyWorkspace(object):
     for i,assembly in enumerate(workspace_this_iter):
       if interrupt_callable():
         return
-      extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
-                                                         self.curr_min_score)
-      if extended_assemblies is None:
+      if assembly.best_case() < self.curr_min_score:
         drop_from_workspace_idx.append(i)
         continue
       else:
-        assert assembly is extended_assemblies[-1]
-        if self.check_completion_status(extended_assemblies.pop()) is None:
+        extended_assemblies = assembly.generate_extensions(
+                                                   self.encountered_assemblies,
+                                                           self.curr_min_score)
+        if extended_assemblies is None:
           drop_from_workspace_idx.append(i)
-      self.update_workspace([asbly for asbly in extended_assemblies
-                             if self.check_completion_status(asbly) is not None])
+          continue
+        else:
+          assert assembly is extended_assemblies[-1]
+          if self.check_completion_status(extended_assemblies.pop()) is None:
+            drop_from_workspace_idx.append(i)
+        self.update_workspace([asbly for asbly in extended_assemblies
+                               if self.check_completion_status(asbly)
+                                                                  is not None])
     for i in drop_from_workspace_idx[::-1]:
       self.workspace.pop(i)
     self.finalize_workspace()
