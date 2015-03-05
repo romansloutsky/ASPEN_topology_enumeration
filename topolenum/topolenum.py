@@ -1250,10 +1250,11 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     elif compressed:
       print >>self.monitor,stamp,"\t%0.5f\t" % assembly[1],assembly[2],'\t'+message
     else:
-      print >>self.monitor,stamp,"\t%0.5f\t" % assembly.score,\
+      print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
+                                 "\t%0.5f\t" % assembly.best_case(),\
                                  len(assembly.pairs_accounted_for),\
-                                 "\t%0.5f" % (assembly.score/len(
-                                 assembly.pairs_accounted_for)),'\t'+message,\
+                                 "\t%0.5f\t" % (assembly.score/len(
+                                 assembly.pairs_accounted_for)),message,\
                                  self.encountered_assemblies.make_str_repr(
                                        assembly.current_clades_as_nested_sets)
   
