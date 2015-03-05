@@ -903,6 +903,8 @@ class AssemblyWorkspace(object):
                                                      counter):
     if popped[2] > self.curr_min_score:
       self.topoff_count += 1
+      # Check assemblies extension prospects here - no need to try extending it
+      # if they are bad
       if popped[3] >= self.acceptance_criterion:
         uncompressed_assembly = TreeAssembly.uncompress(popped)
         self.log("TopoffAccepted",uncompressed_assembly)
@@ -1035,6 +1037,7 @@ class AssemblyWorkspace(object):
         return
       self.log("WorkingOn",assembly)
       if assembly.best_case() < self.curr_min_score:
+        self.log("AbandonedBestCase",assembly)
         drop_from_workspace_idx.append(i)
         continue
       else:
@@ -1042,7 +1045,7 @@ class AssemblyWorkspace(object):
                                                    self.encountered_assemblies,
                                                            self.curr_min_score)
         if extended_assemblies is None:
-          self.log("Abandoned",assembly)
+          self.log("AbandonedNoExtensions",assembly)
           drop_from_workspace_idx.append(i)
           continue
         else:
