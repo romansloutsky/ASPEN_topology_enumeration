@@ -907,7 +907,7 @@ class AssemblyWorkspace(object):
       # if they are bad
       if popped[3] >= self.acceptance_criterion:
         uncompressed_assembly = TreeAssembly.uncompress(popped)
-        self.log("TopoffAccepted",uncompressed_assembly)
+        self.log("TopoffAccepted",uncompressed_assembly,best_case=popped[2])
         self.workspace.append(uncompressed_assembly)
       else:
         self.log("TopoffPostponed",popped,compressed=True)
@@ -1230,7 +1230,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def time_stamp(self):
     return "%0.5f" % (time.time()-self.start_time.value)
   
-  def log(self,message,assembly=None,proc_stamp=True,compressed=False):
+  def log(self,message,assembly=None,proc_stamp=True,compressed=False,best_case=None):
     currscore = self.curr_min_score
     currscore = 'min_score='+repr(None) if currscore == -sys.float_info.max\
                                            else "min_score=%0.5f" % currscore
@@ -1251,8 +1251,9 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
       print >>self.monitor,stamp,"\t%0.5f" % assembly[1],\
                                  "\t%0.5f\t" % assembly[2],assembly[3],'\t'+message
     else:
+      best_case = best_case or assembly.best_case()
       print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
-                                 "\t%0.5f\t" % assembly.best_case(),\
+                                 "\t%0.5f\t" % best_case,\
                                  len(assembly.pairs_accounted_for),\
                                  "\t%0.5f\t" % (assembly.score/len(
                                  assembly.pairs_accounted_for)),message,\
