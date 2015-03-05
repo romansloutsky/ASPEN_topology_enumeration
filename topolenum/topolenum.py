@@ -1248,7 +1248,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     if assembly is None:
       print >>self.monitor,stamp,message
     elif compressed:
-      print >>self.monitor,stamp,"\t%0.5f\t" % assembly[1],assembly[2],'\t'+message
+      print >>self.monitor,stamp,"\t%0.5f" % assembly[1],\
+                                 "\t%0.5f\t" % assembly[2],assembly[3],'\t'+message
     else:
       print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
                                  "\t%0.5f\t" % assembly.best_case(),\
