@@ -345,7 +345,8 @@ class TreeAssembly(object):
                                      for c in state['built_clades'])
     for k,v in self.pickle_encoding.items():
       state['built_clades'] = state['built_clades'].replace(v,k)
-    return state['built_clades'],state['score'],len(self.pairs_accounted_for)
+    return state['built_clades'],state['score'],self.best_case(),\
+                                                  len(self.pairs_accounted_for)
   
   def __setstate__(self,state):
     s = StringIO(state[0])
@@ -899,11 +900,11 @@ class AssemblyWorkspace(object):
   def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
                                                      counter):
-    if popped[1] > self.curr_min_score:
+    if popped[2] > self.curr_min_score:
       self.topoff_count += 1
       # Check assemblies extension prospects here - no need to try extending it
       # if they are bad
-      if popped[2] >= self.acceptance_criterion:
+      if popped[3] >= self.acceptance_criterion:
         self.workspace.append(TreeAssembly.uncompress(popped))
       else:
         counter[0] += 1
