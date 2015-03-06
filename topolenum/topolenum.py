@@ -1197,7 +1197,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   
   def __init__(self,fifo,queue,min_score,shared_encountered_assemblies_dict,
                score_submission_queue,start_time_val,leaves_to_assemble,seed_assembly,
-               num_requested_trees,max_workspace_size):
+               num_requested_trees,max_workspace_size,
+               max_monitor_file_size=100*1024**2):
     encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
                                             shared_encountered_assemblies_dict)
     AssemblyWorkspace.__init__(self,seed_assembly,num_requested_trees,
@@ -1209,13 +1210,27 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     self.score_submission_queue = score_submission_queue
     
     self.start_time = start_time_val
-    self.monitor = open(multiprocessing.current_process().name+'_activity_dump','w',0)
+    self._max_monitor_file_size = max_monitor_file_size
+    self._monitor_file_count = 1
+    self.proc_name = multiprocessing.current_process().name
   
   def check_if_num_requested_trees_reached(self):
     # Multiply initial value by 0.9, because who knows if the comparison
     # -sys.float_info.max > -sys.float_info.max may sometimes return true?
     return self._curr_min_score.value > -sys.float_info.max*0.9
 
+  @property
+  def monitor(self):
+    if not hasattr(self,'_monitor'):
+      self._monitor = open(self.proc_name+'_activity_dump001','w',0)
+    elif os.path.getsize(self._monitor.name) > self._max_monitor_file_size:
+      self._monitor.close()
+      self._monitor_file_count += 1
+      self._monitor = open(self.proc_name+'_activity_dump'+\
+                           str(self._monitor_file_count).zfill(3),
+                           'w',0)
+    return self._monitor
+  
   @property
   def complete_trees_fh(self):
     if not hasattr(self,'_complete_trees_fh'):
