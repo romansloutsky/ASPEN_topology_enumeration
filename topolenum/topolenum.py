@@ -849,7 +849,7 @@ class CladeReprTracker(object):
 class AssemblyWorkspace(object):
   def __init__(self,seed_assembly,num_requested_trees,max_workspace_size,
                     encountered_assemblies_storage,fifo=None,
-                    track_min_score=True):
+                    track_min_score=True,acceptance_param=3.0):
     if isinstance(seed_assembly,list):
       seed_assembly = TreeAssembly(*seed_assembly)
     self.workspace = [seed_assembly]
@@ -873,6 +873,8 @@ class AssemblyWorkspace(object):
     self.topoff_count = 0
     self.topoff_param1 = 1
     self.topoff_param2 = 1
+    self.acp1 = acceptance_param
+    self.acp2 = 0.75/acceptance_param
   
   def check_if_num_requested_trees_reached(self):
     return len(self.accepted_assemblies) >= self.num_requested_trees
@@ -890,20 +892,18 @@ class AssemblyWorkspace(object):
   @property
   def acceptance_criterion(self):
     ratio = float(self.topoff_count)/self.push_count
-    if ratio > 1.0:
+    if ratio > self.acp1:
       return 0
     elif ratio < 0.1:
-      return self.num_total_pairs*0.9
+      return self.num_total_pairs*0.75
     else:
-      return self.num_total_pairs*(1-ratio/2)
+      return self.num_total_pairs*(0.75-ratio/self.acp2)
   
   def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
                                                      counter):
     if popped[2] > self.curr_min_score:
       self.topoff_count += 1
-      # Check assemblies extension prospects here - no need to try extending it
-      # if they are bad
       if popped[3] >= self.acceptance_criterion:
         self.workspace.append(TreeAssembly.uncompress(popped))
       else:
