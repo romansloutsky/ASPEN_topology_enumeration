@@ -849,7 +849,8 @@ class CladeReprTracker(object):
 class AssemblyWorkspace(object):
   def __init__(self,seed_assembly,num_requested_trees,max_workspace_size,
                     encountered_assemblies_storage,fifo=None,
-                    track_min_score=True,acceptance_param=3.0):
+                    track_min_score=True,acceptance_ratio_param=3.0,
+                    acceptance_stiffness_param=3):
     if isinstance(seed_assembly,list):
       seed_assembly = TreeAssembly(*seed_assembly)
     self.workspace = [seed_assembly]
@@ -873,8 +874,9 @@ class AssemblyWorkspace(object):
     self.topoff_count = 0
     self.topoff_param1 = 1
     self.topoff_param2 = 1
-    self.acp1 = acceptance_param
-    self.acp2 = 0.75/acceptance_param
+    self.accrp1 = acceptance_ratio_param
+    self.accrp2 = 0.75/acceptance_ratio_param
+    self.accsp = acceptance_stiffness_param
   
   def check_if_num_requested_trees_reached(self):
     return len(self.accepted_assemblies) >= self.num_requested_trees
@@ -892,12 +894,12 @@ class AssemblyWorkspace(object):
   @property
   def acceptance_criterion(self):
     ratio = float(self.topoff_count)/self.push_count
-    if ratio > self.acp1:
+    if ratio > self.accrp1:
       return 0
     elif ratio < 0.1:
       return self.num_total_pairs*0.75
     else:
-      return self.num_total_pairs*(0.75-ratio/self.acp2)
+      return self.num_total_pairs*(0.75-(ratio/self.accrp2)**self.accsp)
   
   def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
