@@ -874,8 +874,7 @@ class AssemblyWorkspace(object):
     self.topoff_count = 0
     self.topoff_param1 = 1
     self.topoff_param2 = 1
-    self.accrp1 = acceptance_ratio_param
-    self.accrp2 = 0.75/acceptance_ratio_param
+    self.accrp = acceptance_ratio_param
     self.accsp = acceptance_stiffness_param
   
   def check_if_num_requested_trees_reached(self):
@@ -894,12 +893,12 @@ class AssemblyWorkspace(object):
   @property
   def acceptance_criterion(self):
     ratio = float(self.topoff_count)/self.push_count
-    if ratio > self.accrp1:
+    if ratio > self.accrp:
       return 0
     elif ratio < 0.1:
       return self.num_total_pairs*0.75
     else:
-      return self.num_total_pairs*(0.75-(ratio/self.accrp2)**self.accsp)
+      return self.num_total_pairs*(0.75-0.75*(ratio/self.accrp)**self.accsp)
   
   def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
