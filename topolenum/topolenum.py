@@ -1184,12 +1184,12 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   
   def __init__(self,fifo,queue,min_score,shared_encountered_assemblies_dict,
                score_submission_queue,leaves_to_assemble,seed_assembly,
-               num_requested_trees,max_workspace_size):
+               num_requested_trees,max_workspace_size,**kwargs):
     encountered_assemblies = SharedCladeReprTracker(leaves_to_assemble,
                                             shared_encountered_assemblies_dict)
     AssemblyWorkspace.__init__(self,seed_assembly,num_requested_trees,
                                     max_workspace_size,encountered_assemblies,
-                                    fifo,track_min_score=False)
+                                    fifo,track_min_score=False,**kwargs)
     
     self._curr_min_score = min_score
     self.queue = queue
@@ -1344,7 +1344,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                     constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
                     max_workspace_size=10000,max_queue_size=10000,
                     fifo_max_file_size=1.0,num_requested_topologies=1000,
-                    num_workers=1):
+                    num_workers=1,**kwargs):
     multiprocessing.Process.__init__(self)
     self.assembly_queue_manager = multiprocessing.Manager()
     self.assembly_queue = self.assembly_queue_manager.Queue(max_queue_size)
@@ -1370,6 +1370,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                                         self.constraint_freq_cutoff,
                                         self.leaves,self.absolute_freq_cutoff,
                                         keep_alive_when_pickling=False)
+    self.kwargs = kwargs
   
   def clean_up(self):
     self.assembly_queue_manager.shutdown()
@@ -1389,12 +1390,10 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                                   SharedCladeReprTracker(self.leaves,
                                             self.encountered_assemblies_dict))]
     seed_assemblies.sort(key=lambda a: a.score/len(a.pairs_accounted_for))
+    self.kwargs.update({'num_requested_trees':self.num_requested_topologies,
+                        'max_workspace_size':self.max_workspace_size})
     workspace_args = namedtuple('ArgsKwargs',
-                                ['args','kwargs'])((self.leaves,),
-                                                   {'num_requested_trees':
-                                                      self.num_requested_topologies,
-                                                    'max_workspace_size':
-                                                      self.max_workspace_size})
+                                ['args','kwargs'])((self.leaves,),self.kwargs)
     self.accepted_scores = []
     try:
       procs = [AssemblerProcess(self.assembly_queue,
