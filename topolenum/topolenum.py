@@ -1296,8 +1296,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
                                                      counter)
   
   def push_to_fifo(self,push_these):
-    for item in push_these:
-      self.log("Pushing",item,compressed=True)
+#     for item in push_these:
+#       self.log("Pushing",item,compressed=True)
     self.fifo.push_all(item for item in push_these)
   
   def check_completion_status(self,assembly):
@@ -1315,7 +1315,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
           self.rejected_assemblies.append(self.accepted_assemblies.pop(i))
       return
     else:
-      self.log("Extended",assembly)
+#       self.log("Extended",assembly)
       return assembly
   
   def iterate(self,*args,**kwargs):
