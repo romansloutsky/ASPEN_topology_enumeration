@@ -392,7 +392,6 @@ class TreeAssembly(object):
     copy_of_self._pairs_accounted_for = {p for p in self._pairs_accounted_for}
     copy_of_self.built_clades = [bc for bc in self.built_clades]
     copy_of_self.constraints_idx = [c for c in self.constraints_idx]
-    copy_of_self.keep_alive = self.keep_alive
     return copy_of_self
   
   def recompute(self,*args,**kwargs):
