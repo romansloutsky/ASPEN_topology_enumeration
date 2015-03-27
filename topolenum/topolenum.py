@@ -638,7 +638,6 @@ class TreeAssembly(object):
           build_in = self
         else:
           build_in = self.copy()
-        build_in._best_case = None
         idx_of_pair,pair = extension # Now we can get the key (index of pair in constraints_idx)
         
         # Select for dropping all pairs with distance 1 and one member of pair - they can't
@@ -662,6 +661,8 @@ class TreeAssembly(object):
         build_in.recompute(extension=pair)
         build_in.score += math.log(pair.freq)
         extended_assemblies.append(build_in)
+    for a in extended_assemblies:
+      a._best_case = None
     return extended_assemblies
   
   def generate_extensions(self,encountered_assemblies,min_score=None):
