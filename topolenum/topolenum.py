@@ -903,8 +903,6 @@ class AssemblyWorkspace(object):
                                                      counter):
     if popped[2] > self.curr_min_score:
       self.topoff_count += 1
-      # Check assemblies extension prospects here - no need to try extending it
-      # if they are bad
       if popped[3] >= self.acceptance_criterion:
         uncompressed_assembly = TreeAssembly.uncompress(popped)
         self.log("TopoffAccepted",uncompressed_assembly,best_case=popped[2])
@@ -1234,7 +1232,8 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   @property
   def complete_trees_fh(self):
     if not hasattr(self,'_complete_trees_fh'):
-      self._complete_trees_fh = open(multiprocessing.current_process().name+'_complete_trees','w')
+      self._complete_trees_fh = open(multiprocessing.current_process().name+\
+                                     '_complete_trees','w',0)
     return self._complete_trees_fh
 
   @property
