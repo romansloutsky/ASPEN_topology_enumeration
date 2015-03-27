@@ -345,7 +345,7 @@ class TreeAssembly(object):
                                      for c in state['built_clades'])
     for k,v in self.pickle_encoding.items():
       state['built_clades'] = state['built_clades'].replace(v,k)
-    return state['built_clades'],state['score'],self.best_case(),\
+    return state['built_clades'],state['score'],self.best_case,\
                                                   len(self.pairs_accounted_for)
   
   def __setstate__(self,state):
@@ -357,7 +357,7 @@ class TreeAssembly(object):
         break
       else:
         clades.append(self.pickle_encoding[read_byte])
-    state = {'score':state[1],
+    state = {'score':state[1],'_best_case':state[2],
              'built_clades':[self.convert_containers(eval(m),frozenset)
                              for m in ''.join(clades).split(';')]}
     for k,v in state.items():
@@ -493,7 +493,13 @@ class TreeAssembly(object):
     clades.append(new_clade)
     return clades
   
-  def best_case(self,pairs_accounted_for=None,distances_to_root=None,
+  @property
+  def best_case(self):
+    if not hasattr(self,'_best_case') or self._best_case is None:
+      self._best_case = self.calculate_best_case()
+    return self._best_case
+  
+  def calculate_best_case(self,pairs_accounted_for=None,distances_to_root=None,
                      score=None):
     pairs_accounted_for = pairs_accounted_for or self.pairs_accounted_for
     distances_to_root = distances_to_root or self.distances_to_root
@@ -537,9 +543,9 @@ class TreeAssembly(object):
       best_possible_final_score = self.score + extension.score
     except AttributeError:
       best_possible_final_score = self.score + math.log(extension.freq)
-    return self.best_case(updated_pairs_accounted_for,
-                          updated_distances_to_root,
-                          best_possible_final_score)
+    return self.calculate_best_case(updated_pairs_accounted_for,
+                                    updated_distances_to_root,
+                                    best_possible_final_score)
   
   def filter_proposed_extensions(self,new_pairs,joins,attachments,
                                  encountered,min_score=None):
@@ -632,6 +638,7 @@ class TreeAssembly(object):
           build_in = self
         else:
           build_in = self.copy()
+        build_in._best_case = None
         idx_of_pair,pair = extension # Now we can get the key (index of pair in constraints_idx)
         
         # Select for dropping all pairs with distance 1 and one member of pair - they can't
@@ -1025,7 +1032,7 @@ class AssemblyWorkspace(object):
     for i,assembly in enumerate(workspace_this_iter):
       if interrupt_callable():
         return
-      if assembly.best_case() < self.curr_min_score:
+      if assembly.best_case < self.curr_min_score:
         drop_from_workspace_idx.append(i)
         continue
       else:
