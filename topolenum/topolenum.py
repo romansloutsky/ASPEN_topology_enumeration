@@ -554,8 +554,9 @@ class TreeAssembly(object):
     
     for extension_set in (new_pairs,joins,attachments):
       for key,extension in extension_set.items():
+        nested_repr = self.as_nested_sets(extension)
         # First filter: has extension been encountered before?
-        if encountered.already_encountered(self.as_nested_sets(extension)):
+        if encountered.already_encountered(nested_repr):
           extension_set.pop(key)
           continue
         # Second filter: is score with extension already worse than min_score?
@@ -574,6 +575,7 @@ class TreeAssembly(object):
         if best_case is None or best_case < min_score:
           extension_set.pop(key)
           continue
+        encountered.remember(nested_repr)
     
     return new_pairs,joins,attachments
   
@@ -918,6 +920,10 @@ class AssemblyWorkspace(object):
       else:
         counter[0] += 1
         rejected_assemblies.append(popped)
+    else:
+      self.encountered_assemblies.forget(
+                 TreeAssembly.uncompress(popped).current_clades_as_nested_sets)
+
   
   def fill_workspace_from_fifo(self,max_size,rejected_assemblies,counter):
     while len(self.workspace) < max_size and counter[0] < 100:
@@ -1051,7 +1057,8 @@ class AssemblyWorkspace(object):
                                if self.check_completion_status(asbly)
                                                                   is not None])
     for i in drop_from_workspace_idx[::-1]:
-      self.workspace.pop(i)
+      self.encountered_assemblies.forget(
+                           self.workspace.pop(i).current_clades_as_nested_sets)
     self.finalize_workspace()
     self.iternum += 1
 
@@ -1178,12 +1185,16 @@ class SharedCladeReprTracker(CladeReprTracker):
     self.leaves = {leaf:i+1 for i,leaf in enumerate(sorted(leaves))}
   
   def already_encountered(self, cladeset):
-    csrepr = self.make_str_repr(cladeset)
-    if csrepr in self.encountered:
-      return True
-    else:
-      self.encountered[csrepr] = None
-      return False
+    return self.make_str_repr(cladeset) in self.encountered
+  
+  def remember(self,cladeset):
+    self.encountered[self.make_str_repr(cladeset)] = None
+  
+  def forget(self,cladeset):
+    try:
+      self.encountered.pop(self.make_str_repr(cladeset))
+    except KeyError:
+      pass
 
 
 class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
