@@ -1285,7 +1285,7 @@ class AssemblerProcess(multiprocessing.Process):
                     score_submission_queue,seed_assembly,pass_to_workspace,
                     results_queue,fifo_max_file_size=1.0):
     multiprocessing.Process.__init__(self,name='AssemblerProcess-'\
-                                                          +str(self.instcount))
+                                                 +str(self.instcount).zfill(3))
     
     self.queue = queue
     self.min_score = shared_min_score
