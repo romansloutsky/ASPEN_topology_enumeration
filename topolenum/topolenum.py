@@ -295,6 +295,7 @@ class TreeAssembly(object):
     type(self).pickle_encoding = {chr(i):t for i,t in enumerate('[],;')}
     type(self).pickle_encoding.update({chr(i+4):repr(l) for i,l in
                                        enumerate(type(self).leaves_master)})
+    type(self).total_nodes_to_build = len(leaves_to_assemble) - 1
     type(self).keep_alive = keep_alive_when_pickling
     
     #===========================================================================
@@ -497,6 +498,22 @@ class TreeAssembly(object):
     if not hasattr(self,'_best_case') or self._best_case is None:
       self._best_case = self.calculate_best_case()
     return self._best_case
+  
+  @property
+  def nodes_left_to_build(self):
+    if not hasattr(self,'_nodes_left_to_build')\
+                                          or self._nodes_left_to_build is None:
+      self._nodes_left_to_build = len(self.built_clades) +\
+                                                      len(self.free_leaves) - 1
+    return self._nodes_left_to_build
+  
+  @property
+  def built_nodes_count(self):
+    if not hasattr(self,'_built_nodes_count')\
+                                            or self._built_nodes_count is None:
+      self._built_nodes_count = self.total_nodes_to_build\
+                                                     - self.nodes_left_to_build
+    return self._built_nodes_count
   
   def calculate_best_case(self,pairs_accounted_for=None,distances_to_root=None,
                      score=None):
