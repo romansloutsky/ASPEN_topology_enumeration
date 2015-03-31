@@ -1008,9 +1008,8 @@ class AssemblyWorkspace(object):
     self.new_assembly_cache = []
     if not self.reached_num_requested_trees:
       if self.workspace:
-        small_wksp_criterion = min(len(a.pairs_accounted_for)
-                                   for a in self.workspace) <\
-                                            self.num_total_pairs*0.75
+        small_wksp_criterion = max(a.nodes_left_to_build
+                                   for a in self.workspace) > 3
       else:
         small_wksp_criterion = True
       self.current_max = 10 if small_wksp_criterion\
