@@ -360,7 +360,7 @@ class TreeAssembly(object):
         break
       else:
         clades.append(self.pickle_encoding[read_byte])
-    state = {'score':state[1],'_best_case':state[2],
+    state = {'score':state[1],'_best_case':state[2],'_nodes_left_to_build':state[3],
              'built_clades':[self.convert_containers(eval(m),frozenset)
                              for m in ''.join(clades).split(';')]}
     for k,v in state.items():
