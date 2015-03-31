@@ -515,6 +515,11 @@ class TreeAssembly(object):
                                                      - self.nodes_left_to_build
     return self._built_nodes_count
   
+  def reset(self):
+    self._best_case = None
+    self._nodes_left_to_build = None
+    self._built_nodes_count = None
+  
   def calculate_best_case(self,pairs_accounted_for=None,distances_to_root=None,
                      score=None):
     pairs_accounted_for = pairs_accounted_for or self.pairs_accounted_for
@@ -680,7 +685,7 @@ class TreeAssembly(object):
         build_in.score += math.log(pair.freq)
         extended_assemblies.append(build_in)
     for a in extended_assemblies:
-      a._best_case = None
+      a.reset()
     return extended_assemblies
   
   def generate_extensions(self,encountered_assemblies,min_score=None):
