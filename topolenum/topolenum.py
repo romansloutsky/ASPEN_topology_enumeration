@@ -296,6 +296,8 @@ class TreeAssembly(object):
     type(self).pickle_encoding.update({chr(i+4):repr(l) for i,l in
                                        enumerate(type(self).leaves_master)})
     type(self).total_nodes_to_build = len(leaves_to_assemble) - 1
+    type(self).best_possible = sum(math.log(max(p[1],key=lambda x: x[1])[1])
+                                   for p in pwleafdist_histograms)
     type(self).keep_alive = keep_alive_when_pickling
     
     #===========================================================================
@@ -519,6 +521,12 @@ class TreeAssembly(object):
     self._best_case = None
     self._nodes_left_to_build = None
     self._built_nodes_count = None
+  
+  @property
+  def sort_key(self):
+    return self.best_possible + self.score/len(self.pairs_accounted_for) if\
+      float(self.built_nodes_count)/self.total_nodes_to_build < 0.4 else\
+      self.best_case/self.built_nodes_count
   
   def calculate_best_case(self,pairs_accounted_for=None,distances_to_root=None,
                      score=None):
@@ -993,9 +1001,7 @@ class AssemblyWorkspace(object):
   
   def update_workspace(self,new_assemblies):
     self.new_assembly_cache.extend(new_assemblies)
-    self.new_assembly_cache.sort(key=lambda a:\
-                                            a.score/len(a.pairs_accounted_for),
-                                 reverse=True)
+    self.new_assembly_cache.sort(key=lambda a:a.sort_key,reverse=True)
     max_size = self.max_workspace_size if self.reached_num_requested_trees\
                                                           else self.current_max
     if len(self.new_assembly_cache) > max_size:
@@ -1003,8 +1009,7 @@ class AssemblyWorkspace(object):
   
   def finalize_workspace(self):
     self.workspace.extend(self.new_assembly_cache)
-    self.workspace.sort(key=lambda a: a.score/len(a.pairs_accounted_for),
-                        reverse=True)
+    self.workspace.sort(key=lambda a: a.sort_key,reverse=True)
     self.new_assembly_cache = []
     if not self.reached_num_requested_trees:
       if self.workspace:
@@ -1428,7 +1433,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                          for a in old_a.generate_extensions(
                                   SharedCladeReprTracker(self.leaves,
                                             self.encountered_assemblies_dict))]
-    seed_assemblies.sort(key=lambda a: a.score/len(a.pairs_accounted_for))
+    seed_assemblies.sort(key=lambda a: a.sort_key)
     self.kwargs.update({'num_requested_trees':self.num_requested_topologies,
                         'max_workspace_size':self.max_workspace_size})
     workspace_args = namedtuple('ArgsKwargs',
