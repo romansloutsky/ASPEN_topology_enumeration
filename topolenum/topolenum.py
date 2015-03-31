@@ -1309,17 +1309,14 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     if assembly is None:
       print >>self.monitor,stamp,message
     elif compressed:
-      print >>self.monitor,stamp,"\t%0.5f" % assembly[1],\
-                                 "\t%0.5f\t" % assembly[2],assembly[3],\
-                                 "\t%0.5f\t" % (assembly[1]/assembly[3]),\
+      print >>self.monitor,stamp,"\t%0.5f\t" % assembly[2],assembly[3],\
+                                 "\t%0.5f\t" % (assembly[2]/assembly[3]),\
                                  message
     else:
       best_case = best_case or assembly.best_case
-      print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
-                                 "\t%0.5f\t" % best_case,\
-                                 len(assembly.pairs_accounted_for),\
-                                 "\t%0.5f\t" % (assembly.score/len(
-                                 assembly.pairs_accounted_for)),message,\
+      print >>self.monitor,stamp,"\t%0.5f\t" % best_case,\
+                                 assembly.nodes_left_to_build,\
+                                 "\t%0.5f\t" % assembly.sort_key,message,\
                                  self.encountered_assemblies.make_str_repr(
                                        assembly.current_clades_as_nested_sets)
   
