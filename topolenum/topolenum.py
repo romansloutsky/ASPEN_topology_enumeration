@@ -349,7 +349,7 @@ class TreeAssembly(object):
     for k,v in self.pickle_encoding.items():
       state['built_clades'] = state['built_clades'].replace(v,k)
     return state['built_clades'],state['score'],self.best_case,\
-                                                  len(self.pairs_accounted_for)
+                                                       self.nodes_left_to_build
   
   def __setstate__(self,state):
     s = StringIO(state[0])
@@ -888,8 +888,8 @@ class CladeReprTracker(object):
 class AssemblyWorkspace(object):
   def __init__(self,seed_assembly,num_requested_trees,max_workspace_size,
                     encountered_assemblies_storage,fifo=None,
-                    track_min_score=True,acceptance_ratio_param=3.0,
-                    acceptance_stiffness_param=3):
+                    track_min_score=True,acceptance_ratio_param=2.0,
+                    acceptance_stiffness_param=1.0):
     if isinstance(seed_assembly,list):
       seed_assembly = TreeAssembly(*seed_assembly)
     self.workspace = [seed_assembly]
@@ -908,7 +908,7 @@ class AssemblyWorkspace(object):
     
     self.push_cache = []
     self.iternum = 1
-    self.num_total_pairs = len(seed_assembly.pwdist_histograms_dict)
+    self.total_nodes_to_build = seed_assembly.total_nodes_to_build
     self.push_count = 1 # "Pseudocount" to avoid division by 0
     self.topoff_count = 0
     self.topoff_param1 = 1
@@ -933,18 +933,19 @@ class AssemblyWorkspace(object):
   def acceptance_criterion(self):
     ratio = float(self.topoff_count)/self.push_count
     if ratio > self.accrp:
-      return 0
+      return self.total_nodes_to_build
     elif ratio < 0.1:
-      return self.num_total_pairs*0.75
+      return 3
     else:
-      return self.num_total_pairs*(0.75-0.75*(ratio/self.accrp)**self.accsp)
+      return self.total_nodes_to_build - (self.total_nodes_to_build-3)*\
+                          ((self.accrp-ratio)/(self.accrp-0.1))**self.accsp
   
   def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
                                                      counter):
     if popped[2] > self.curr_min_score:
       self.topoff_count += 1
-      if popped[3] >= self.acceptance_criterion:
+      if popped[3] <= self.acceptance_criterion:
         self.workspace.append(TreeAssembly.uncompress(popped))
       else:
         counter[0] += 1
