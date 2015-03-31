@@ -955,9 +955,10 @@ class AssemblyWorkspace(object):
         counter[0] += 1
         rejected_assemblies.append(popped)
     else:
+      uncompressed_assembly = TreeAssembly.uncompress(popped)
       self.encountered_assemblies.forget(
-                 TreeAssembly.uncompress(popped).current_clades_as_nested_sets)
-      self.log("TopoffRejected",popped,compressed=True)
+                           uncompressed_assembly.current_clades_as_nested_sets)
+      self.log("TopoffRejected",uncompressed_assembly)
 
   
   def fill_workspace_from_fifo(self,max_size,rejected_assemblies,counter):
