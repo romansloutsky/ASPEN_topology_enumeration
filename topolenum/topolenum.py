@@ -1009,8 +1009,8 @@ class AssemblyWorkspace(object):
       self.push(too_many_here.pop())
   
   def update_workspace(self,new_assemblies):
-    for assembly in new_assemblies:
-      self.log("CachedNewAssembly",assembly)
+#     for assembly in new_assemblies:
+#       self.log("CachedNewAssembly",assembly)
     self.new_assembly_cache.extend(new_assemblies)
     self.new_assembly_cache.sort(key=lambda a:a.sort_key,reverse=True)
     max_size = self.max_workspace_size if self.reached_num_requested_trees\
@@ -1360,7 +1360,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
           self.rejected_assemblies.append(self.accepted_assemblies.pop(i))
       return
     else:
-#       self.log("Extended",assembly)
+      self.log("Extended",assembly)
       return assembly
   
   def iterate(self,*args,**kwargs):
