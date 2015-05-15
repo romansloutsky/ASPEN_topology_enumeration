@@ -1431,6 +1431,7 @@ class AssemblerProcess(multiprocessing.Process):
     
     self.close_fifo = multiprocessing.Event()
     
+    self.proceed_permission = multiprocessing.Event()
     self.finished = multiprocessing.Event()
     self.shutdown = multiprocessing.Event()
     self.results_queue = results_queue
@@ -1448,12 +1449,16 @@ class AssemblerProcess(multiprocessing.Process):
     self.queue_loader_p = QueueLoader(self.fifo,self.close_fifo,self.queue)
     self.queue_loader_p.start()
     self.fifo.start_IN_end()
+    self.proceed_permission.set()
     try:
       iter_result = None
       iter_counter = 0
       while not self.shutdown.is_set():
         iter_counter += 1
         iter_result = self.assemblies.iterate(self.shutdown.is_set)
+        if not self.proceed_permission.is_set():
+          self.fifo.set()
+          self.proceed_permission.wait()
         if iter_result == 'FINISHED':
           self.finished.set()
           if self.shutdown.wait(5):
@@ -1481,8 +1486,10 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                     constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
                     max_workspace_size=10000,max_queue_size=10000,
                     fifo_max_file_size=1.0,num_requested_topologies=1000,
-                    num_workers=1,**kwargs):
+                    num_workers=1,save_file_name='early_termination_save',
+                    **kwargs):
     multiprocessing.Process.__init__(self)
+    self.save_file_name = save_file_name
     self.assembly_queue_manager = multiprocessing.Manager()
     self.assembly_queue = self.assembly_queue_manager.Queue(max_queue_size)
     self.encountered_assemblies_manager = multiprocessing.Manager()
@@ -1520,6 +1527,38 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.scores_queue.join_thread()
     self.send_PIDs.close()
     self.get_PIDs.close()
+  
+  def write_save(self):
+    import os,shutil
+    os.mkdir('tmp_savedir')
+    with open('tmp_savedir/unfinished_assemblies','w',0) as wh:
+      while True:
+        try:
+          pickled_assembly = self.assembly_queue.get_nowait()
+        except Queue.Empty:
+          try:
+            pickled_assembly = self.assembly_queue.get(timeout=60)
+          except Queue.Empty:
+            break
+        pickle.dump(pickled_assembly,wh,pickle.HIGHEST_PROTOCOL)
+    with open('tmp_savedir/encountered_assemblies','w',0) as wh:
+      reverse_leafmap = {v:k for k,v
+                         in CladeReprTracker(self.leaves).leaves.items()}
+      for encoded_assembly in self.encountered_assemblies_dict.keys():
+        decoded_assembly = ''
+        token = ''
+        for character in encoded_assembly:
+          try:
+            int(token+character)
+            token += character
+          except ValueError:
+            if token:
+              decoded_assembly += reverse_leafmap[int(token)]
+              token = ''
+            decoded_assembly += character
+        wh.write(decoded_assembly+'\n')
+    shutil.make_archive(self.save_file_name,'gztar','tmp_savedir')
+    shutil.rmtree('tmp_savedir')
   
   def run(self):
     seed_assemblies = [self.zeroth_assembly]
@@ -1562,8 +1601,16 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
         except Queue.Empty:
           continue
       
-      for p in procs:
-        p.shutdown.set()
+      if self.stop.is_set():
+        for p in procs:
+          p.proceed_permission.clear()
+        self.write_save()
+        for p in procs:
+          p.shutdown.set()
+          p.proceed_permission.set()
+      else:
+        for p in procs:
+          p.shutdown.set()
       
       self.finished.set()
       while not self.shutdown.wait(1):
