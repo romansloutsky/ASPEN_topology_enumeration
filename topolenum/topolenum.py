@@ -113,7 +113,6 @@ class T(T_BASE):
         return cls(cls._to_wrapped_map[clade_repr])
       else:
         return cls._to_wrapped_map[clade_repr]
-        return cls._to_wrapped_map[clade_repr]
     elif isinstance(clade_repr,str):
       leaf = Clade(name=clade_repr)
       cls._to_wrapped_map[clade_repr] = leaf
@@ -1391,12 +1390,11 @@ class AssemblerProcess(multiprocessing.Process):
 
 
 class MainTopologyEnumerationProcess(multiprocessing.Process):
-  def __init__(self,leafdist_histograms,leaves_to_assemble,
-                    constraint_freq_cutoff=0.9,absolute_freq_cutoff=0.01,
-                    max_workspace_size=10000,max_queue_size=10000,
-                    fifo_max_file_size=1.0,num_requested_topologies=1000,
-                    num_workers=1,save_file_name='early_termination_save',
-                    **kwargs):
+  def __init__(self,leafdist_histograms,constraint_freq_cutoff=0.9,
+                    absolute_freq_cutoff=0.01,max_workspace_size=10000,
+                    max_queue_size=10000,fifo_max_file_size=1.0,
+                    num_requested_topologies=1000,num_workers=1,
+                    save_file_name='early_termination_save',**kwargs):
     multiprocessing.Process.__init__(self)
     self.save_file_name = save_file_name
     self.assembly_queue_manager = multiprocessing.Manager()
@@ -1412,7 +1410,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.shutdown = multiprocessing.Event()
     
     self.histograms = leafdist_histograms
-    self.leaves = leaves_to_assemble
+    self.leaves = {l for pair in self.histograms for l in pair[0]}
     self.constraint_freq_cutoff = constraint_freq_cutoff
     self.absolute_freq_cutoff = absolute_freq_cutoff
     self.max_workspace_size = max_workspace_size
@@ -1500,6 +1498,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
           if len(self.accepted_scores) < self.num_requested_topologies\
                                   or proposed_score > self.accepted_scores[-1]:
             self.accepted_scores.append(proposed_score)
+            self.accepted_scores.sort(reverse=True)
             while len(self.accepted_scores) > self.num_requested_topologies:
               self.accepted_scores.pop()
             if len(self.accepted_scores) == self.num_requested_topologies:
@@ -1564,11 +1563,10 @@ class EnumerationObserver(object):
     self.report_score(enum_proc)
 
 
-def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
+def enumerate_topologies(leafdist_histograms,
                          proceed_permission_callable=lambda: True,
                          wait_duration=10,observer_callable=None,**kwargs):
   enumeration_proc = MainTopologyEnumerationProcess(leafdist_histograms,
-                                                    leaves_to_assemble,
                                                     **kwargs)
   enumeration_proc.start()
   workers = {}
