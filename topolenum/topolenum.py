@@ -1543,13 +1543,27 @@ class EnumerationObserver(object):
     self.terminator = terminator_file
     self.old_min_score = -float_info.max
     self.start_time = time.time()
+  
+  def timestamp(self,seconds):
+    stamp = ''
+    true_seconds = seconds
+    if true_seconds >= 86400:
+      stamp += '%0.0fd:' %  ((seconds - seconds % 86400) / 86400)
+      seconds = seconds % 86400
+    if true_seconds >= 3600:
+      stamp += '%0.0fh:' %  ((seconds - seconds % 3600) / 3600)
+      seconds = seconds % 3600
+    if true_seconds >= 60:
+      stamp += '%0.0fm:' %  ((seconds - seconds % 60) / 60)
+      seconds = seconds % 60
+    stamp += '%0.0fs\t  ' % seconds
+    return stamp
 
   def report_score(self,enum_proc):
     if enum_proc.min_score.value > self.old_min_score:
       self.old_min_score = enum_proc.min_score.value
-      print >>stderr,"New worst score accepted at "+\
-                     "%0.5f" % (time.time()-self.start_time)+":",\
-                     self.old_min_score
+      print >>stderr,self.timestamp((time.time()-self.start_time)),\
+                     "New worst score is",self.old_min_score
   
   def proceed_permission_check(self):
     if self.terminator in os.listdir('.'):
