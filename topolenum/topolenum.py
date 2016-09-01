@@ -1544,8 +1544,14 @@ class EnumerationObserver(object):
     self.old_min_score = -float_info.max
     self.start_time = time.time()
   
-  def timestamp(self,seconds):
+  @property
+  def elapsed_time(self):
+    return time.time()-self.start_time
+  
+  @property
+  def timestamp(self):
     stamp = ''
+    seconds = self.elapsed_time
     true_seconds = seconds
     if true_seconds >= 86400:
       stamp += '%0.0fd:' %  ((seconds - seconds % 86400) / 86400)
@@ -1558,12 +1564,14 @@ class EnumerationObserver(object):
       seconds = seconds % 60
     stamp += '%0.0fs\t  ' % seconds
     return stamp
+  
+  def report_timestamp(self):
+    print >>stderr,self.timestamp,"Elapsed since start"
 
   def report_score(self,enum_proc):
     if enum_proc.min_score.value > self.old_min_score:
       self.old_min_score = enum_proc.min_score.value
-      print >>stderr,self.timestamp((time.time()-self.start_time)),\
-                     "New worst score is",self.old_min_score
+      print >>stderr,self.timestamp,"New worst score is",self.old_min_score
   
   def proceed_permission_check(self):
     if self.terminator in os.listdir('.'):
