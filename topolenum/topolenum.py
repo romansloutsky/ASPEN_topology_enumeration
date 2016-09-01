@@ -1,6 +1,5 @@
 import sys
 import time
-import time
 import os
 import math
 import itertools
@@ -352,7 +351,7 @@ class TreeAssembly(object):
     return state['built_clades'],state['score'],self.best_case,\
                                                        self.nodes_left_to_build
   
-  def __setstate__(self,state):
+  def _unpack_state(self,state):
     s = StringIO(state[0])
     clades = []
     while True:
@@ -361,9 +360,12 @@ class TreeAssembly(object):
         break
       else:
         clades.append(self.pickle_encoding[read_byte])
-    state = {'score':state[1],'_best_case':state[2],'_nodes_left_to_build':state[3],
-             'built_clades':[self.convert_containers(eval(m),frozenset)
-                             for m in ''.join(clades).split(';')]}
+    return {'score':state[1],'_best_case':state[2],'_nodes_left_to_build':state[3],
+            'built_clades':[self.convert_containers(eval(m),frozenset)
+                            for m in ''.join(clades).split(';')]}
+  
+  def __setstate__(self,state):
+    state = self._unpack_state(state)
     for k,v in state.items():
       if k != 'built_clades':
         self.__dict__[k] = v
