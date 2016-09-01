@@ -1539,10 +1539,15 @@ from sys import float_info,stderr
 
 
 class EnumerationObserver(object):
-  def __init__(self,terminator_file='stop_enumeration'):
+  ONE_HOUR = 3600
+  
+  def __init__(self,terminator_file='stop_enumeration',
+               timestamp_frequency=ONE_HOUR):
     self.terminator = terminator_file
+    self.timestamp_freq = timestamp_frequency
     self.old_min_score = -float_info.max
     self.start_time = time.time()
+    self.time_of_last_stamp = self.start_time
   
   def time_since(self,time_in_past):
     return time.time()-time_in_past
@@ -1570,6 +1575,7 @@ class EnumerationObserver(object):
   
   def report_timestamp(self):
     print >>stderr,self.timestamp,"Elapsed since start"
+    self.time_of_last_stamp = time.time()
 
   def report_score(self,enum_proc):
     if enum_proc.min_score.value > self.old_min_score:
@@ -1585,6 +1591,8 @@ class EnumerationObserver(object):
     
   
   def __call__(self,enum_proc,workers):
+    if self.time_since(self.time_of_last_stamp) > self.timestamp_freq:
+      self.report_timestamp()
     self.report_score(enum_proc)
 
 
