@@ -1544,14 +1544,17 @@ class EnumerationObserver(object):
     self.old_min_score = -float_info.max
     self.start_time = time.time()
   
+  def time_since(self,time_in_past):
+    return time.time()-time_in_past
+  
   @property
-  def elapsed_time(self):
-    return time.time()-self.start_time
+  def total_elapsed_time(self):
+    return self.time_since(self.start_time)
   
   @property
   def timestamp(self):
     stamp = ''
-    seconds = self.elapsed_time
+    seconds = self.total_elapsed_time
     true_seconds = seconds
     if true_seconds >= 86400:
       stamp += '%0.0fd:' %  ((seconds - seconds % 86400) / 86400)
