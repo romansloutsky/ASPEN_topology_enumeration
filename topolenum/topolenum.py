@@ -1437,7 +1437,6 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.get_PIDs.close()
   
   def write_save(self):
-    import shutil
     os.mkdir('tmp_savedir')
     with open('tmp_savedir/unfinished_assemblies','w',0) as wh:
       while True:
@@ -1465,6 +1464,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
               token = ''
             decoded_assembly += character
         wh.write(decoded_assembly+'\n')
+    import shutil
     shutil.make_archive(self.save_file_name,'gztar','tmp_savedir')
     shutil.rmtree('tmp_savedir')
   
