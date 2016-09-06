@@ -1437,7 +1437,11 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.get_PIDs.close()
   
   def write_save(self):
+    leaf_name_encoding = CladeReprTracker(self.leaves).leaves
+    reverse_encoding = {v:k for k,v in leaf_name_encoding.items()}
     os.mkdir('tmp_savedir')
+    with open('tmp_savedir/leaf_name_encoding','w',0) as wh:
+      wh.write(repr(reverse_encoding)+'\n')
     with open('tmp_savedir/unfinished_assemblies','w',0) as wh:
       while True:
         try:
@@ -1449,8 +1453,6 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
             break
         pickle.dump(pickled_assembly,wh,pickle.HIGHEST_PROTOCOL)
     with open('tmp_savedir/encountered_assemblies','w',0) as wh:
-      reverse_leafmap = {v:k for k,v
-                         in CladeReprTracker(self.leaves).leaves.items()}
       for encoded_assembly in self.encountered_assemblies_dict.keys():
         decoded_assembly = ''
         token = ''
