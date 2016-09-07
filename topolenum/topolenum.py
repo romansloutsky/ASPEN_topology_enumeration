@@ -1062,12 +1062,19 @@ class AssemblyWorkspace(object):
     else:
       return assembly
   
+  def prepare_to_terminate(self):
+    self.workspace.extend(self.new_assembly_cache)
+    while self.workspace:
+      self.push(self.workspace.pop())
+      self.purge_push_cache()
+    self.ready_to_terminate = True
+  
   def iterate(self,interrupt_callable=lambda: False):
     drop_from_workspace_idx = []
     workspace_this_iter = [assembly for assembly in self.workspace]
     for i,assembly in enumerate(workspace_this_iter):
       if interrupt_callable():
-        return
+        continue
       if assembly.best_case < self.curr_min_score:
         drop_from_workspace_idx.append(i)
         continue
@@ -1088,7 +1095,10 @@ class AssemblyWorkspace(object):
     for i in drop_from_workspace_idx[::-1]:
       self.encountered_assemblies.forget(
                            self.workspace.pop(i).current_clades_as_nested_sets)
-    self.finalize_workspace()
+    if interrupt_callable():
+      self.prepare_to_terminate()
+    else:
+      self.finalize_workspace()
     self.iternum += 1
 
 
@@ -1345,7 +1355,7 @@ class AssemblerProcess(multiprocessing.Process):
     
     self.close_fifo = multiprocessing.Event()
     
-    self.proceed_permission = multiprocessing.Event()
+    self.interrupt = multiprocessing.Event()
     self.finished = multiprocessing.Event()
     self.shutdown = multiprocessing.Event()
     self.results_queue = results_queue
@@ -1362,16 +1372,18 @@ class AssemblerProcess(multiprocessing.Process):
     self.queue_loader_p = QueueLoader(self.fifo,self.close_fifo,self.queue)
     self.queue_loader_p.start()
     self.fifo.start_IN_end()
-    self.proceed_permission.set()
     try:
       iter_result = None
       iter_counter = 0
       while not self.shutdown.is_set():
         iter_counter += 1
-        iter_result = self.assemblies.iterate(self.shutdown.is_set)
-        if not self.proceed_permission.is_set():
+        iter_result = self.assemblies.iterate(self.interrupt.is_set)
+        if self.interrupt.is_set():
+          if not hasattr(self.assemblies,'ready_to_terminate'):
+            self.assemblies.prepare_to_terminate()
           self.fifo.set()
-          self.proceed_permission.wait()
+          self.shutdown.wait()
+          break
         if iter_result == 'FINISHED':
           self.finished.set()
           if self.shutdown.wait(5):
@@ -1496,8 +1508,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
         p.start()
         self.send_PIDs.send((p.pid,p.name))
       
-      while any(not p.finished.is_set() for p in procs)\
-                                                    and not self.stop.is_set():
+      while any(not p.finished.is_set() for p in procs):
         try:
           proposed_score = self.scores_queue.get(timeout=0.05)
           if len(self.accepted_scores) < self.num_requested_topologies\
@@ -1508,19 +1519,16 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
               self.accepted_scores.pop()
             if len(self.accepted_scores) == self.num_requested_topologies:
               self.min_score.value = self.accepted_scores[-1]
+          if self.stop.is_set():
+            for p in procs:
+              p.interrupt.set()
+            self.write_save()
+            break
         except Queue.Empty:
           continue
       
-      if self.stop.is_set():
-        for p in procs:
-          p.proceed_permission.clear()
-        self.write_save()
-        for p in procs:
-          p.shutdown.set()
-          p.proceed_permission.set()
-      else:
-        for p in procs:
-          p.shutdown.set()
+      for p in procs:
+        p.shutdown.set()
       
       self.finished.set()
       while not self.shutdown.wait(1):
