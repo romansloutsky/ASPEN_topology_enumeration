@@ -1650,12 +1650,13 @@ def enumerate_topologies(leafdist_histograms,
       new_worker = enumeration_proc.get_PIDs.recv()
       workers[new_worker[0]] = new_worker[1]
   
-  while not enumeration_proc.finished.wait(wait_duration)\
-                                            and proceed_permission_callable():
+  while not enumeration_proc.finished.wait(wait_duration):
     if observer_callable is not None:
       observer_callable(enumeration_proc,workers)
+    if not proceed_permission_callable():
+      enumeration_proc.stop.set()
+      break
   
-  enumeration_proc.stop.set()
   results = []
   finished_worker_counter = 0
   while finished_worker_counter < enumeration_proc.num_workers:
