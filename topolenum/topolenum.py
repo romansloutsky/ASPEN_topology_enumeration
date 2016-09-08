@@ -1463,7 +1463,18 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
             pickled_assembly_state = self.assembly_queue.get(timeout=60)
           except Queue.Empty:
             break
-        pickle.dump(pickled_assembly_state,wh,pickle.HIGHEST_PROTOCOL)
+        state = self.zeroth_assembly._unpack_state(pickled_assembly_state)
+        state['built_clades'] = [T.rebuild_on_unpickle(c).write('as_string',
+                                                                 format='newick',
+                                                                 plain=True)
+                                 for c in state['built_clades']]
+        for i,c in enumerate(state['built_clades']):
+          for k,v in leaf_name_encoding.items():
+            c = c.replace(k,str(v))
+          state['built_clades'][i] = c
+        wh.write(repr((state['built_clades'],round(state['score'],5),
+                       round(state['_best_case'],5),
+                       state['_nodes_left_to_build'])).replace(' ','')+'\n')
     with open('tmp_savedir/encountered_assemblies','w',0) as wh:
       for assembly_repr in self.encountered_assemblies_dict.keys():
         wh.write(assembly_repr+'\n')
