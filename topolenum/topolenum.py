@@ -1465,19 +1465,8 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
             break
         pickle.dump(pickled_assembly_state,wh,pickle.HIGHEST_PROTOCOL)
     with open('tmp_savedir/encountered_assemblies','w',0) as wh:
-      for encoded_assembly in self.encountered_assemblies_dict.keys():
-        decoded_assembly = ''
-        token = ''
-        for character in encoded_assembly:
-          try:
-            int(token+character)
-            token += character
-          except ValueError:
-            if token:
-              decoded_assembly += reverse_leafmap[int(token)]
-              token = ''
-            decoded_assembly += character
-        wh.write(decoded_assembly+'\n')
+      for assembly_repr in self.encountered_assemblies_dict.keys():
+        wh.write(assembly_repr+'\n')
     import shutil
     shutil.make_archive(self.save_file_name,'gztar','tmp_savedir')
     shutil.rmtree('tmp_savedir')
