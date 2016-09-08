@@ -1457,13 +1457,13 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     with open('tmp_savedir/unfinished_assemblies','w',0) as wh:
       while True:
         try:
-          pickled_assembly = self.assembly_queue.get_nowait()
+          pickled_assembly_state = self.assembly_queue.get_nowait()
         except Queue.Empty:
           try:
-            pickled_assembly = self.assembly_queue.get(timeout=60)
+            pickled_assembly_state = self.assembly_queue.get(timeout=60)
           except Queue.Empty:
             break
-        pickle.dump(pickled_assembly,wh,pickle.HIGHEST_PROTOCOL)
+        pickle.dump(pickled_assembly_state,wh,pickle.HIGHEST_PROTOCOL)
     with open('tmp_savedir/encountered_assemblies','w',0) as wh:
       for encoded_assembly in self.encountered_assemblies_dict.keys():
         decoded_assembly = ''
