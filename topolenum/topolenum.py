@@ -1485,6 +1485,20 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     with open('tmp_savedir/encountered_assemblies','w',0) as wh:
       for assembly_repr in self.encountered_assemblies_dict.keys():
         wh.write(assembly_repr+'\n')
+    accepted = []
+    finished_worker_counter = 0
+    while finished_worker_counter < self.num_workers:
+      received = self.results_queue.get()
+      if received == 'FINISHED':
+        finished_worker_counter += 1
+      else:
+        accepted.append(received)
+    accepted.sort(key=lambda x: x.score,reverse=True)
+    with open('tmp_savedir/accepted_complete_assemblies','w',0) as wh:
+      for assembly in accepted:
+        wh.write(str(assembly.score)+'\t')
+        wh.write(assembly.built_clades[0].write('as_string',format='newick',
+                                                plain=True))
     import shutil
     shutil.make_archive(self.save_file_name,'gztar','tmp_savedir')
     shutil.rmtree('tmp_savedir')
