@@ -1360,6 +1360,14 @@ class AssemblerProcess(multiprocessing.Process):
     self.shutdown = multiprocessing.Event()
     self.results_queue = results_queue
   
+  def enqueue_results(self):
+    for assembly in self.assemblies.accepted_assemblies:
+      self.results_queue.put(assembly)
+    if self.assemblies.workspace:
+      print self.name,"At shutdown assembly workspace has",\
+                      len(self.assemblies.workspace),"in it"
+    self.results_queue.put('FINISHED')
+  
   def run(self):
     self.fifo = SharedFIFOfile(suffix='--'+self.name,
                                max_file_size_GB=self.fifo_max_file_size)
@@ -1382,11 +1390,13 @@ class AssemblerProcess(multiprocessing.Process):
           if not hasattr(self.assemblies,'ready_to_terminate'):
             self.assemblies.prepare_to_terminate()
           self.fifo.set()
+          self.enqueue_results()
           self.shutdown.wait()
           break
         if iter_result == 'FINISHED':
           self.finished.set()
           if self.shutdown.wait(5):
+            self.enqueue_results()
             break
           else:
             continue
@@ -1398,9 +1408,6 @@ class AssemblerProcess(multiprocessing.Process):
       self.fifo.tmpdir_obj.__exit__(None,None,None)
       self.queue_loader_p.terminate()
       raise
-    for assembly in self.assemblies.accepted_assemblies:
-      self.results_queue.put(assembly)
-    self.results_queue.put('FINISHED')
     return
 
 
@@ -1675,9 +1682,7 @@ def enumerate_topologies(leafdist_histograms,
       results.append(received)
   
   enumeration_proc.shutdown.set()
-  enumeration_proc.join(30)
-  if enumeration_proc.is_alive():
-    enumeration_proc.terminate()
+  enumeration_proc.join()
   enumeration_proc.clean_up()
   
   results.sort(key=lambda x: x.score,reverse=True)
