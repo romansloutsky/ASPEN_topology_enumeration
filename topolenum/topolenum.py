@@ -1672,21 +1672,23 @@ def enumerate_topologies(leafdist_histograms,
       enumeration_proc.stop.set()
       break
   
-  results = []
-  finished_worker_counter = 0
-  while finished_worker_counter < enumeration_proc.num_workers:
-    received = enumeration_proc.results_queue.get()
-    if received == 'FINISHED':
-      finished_worker_counter += 1
-    else:
-      results.append(received)
-  
+  if enumeration_proc.stop.is_set():
+    results = None
+  elif enumeration_proc.finished.is_set():
+    results = []
+    finished_worker_counter = 0
+    while finished_worker_counter < enumeration_proc.num_workers:
+      received = enumeration_proc.results_queue.get()
+      if received == 'FINISHED':
+        finished_worker_counter += 1
+      else:
+        results.append(received)
+    results.sort(key=lambda x: x.score,reverse=True)
+    while len(results) > enumeration_proc.num_requested_topologies:
+      results.pop()
   enumeration_proc.shutdown.set()
   enumeration_proc.join()
   enumeration_proc.clean_up()
   
-  results.sort(key=lambda x: x.score,reverse=True)
-  while len(results) > enumeration_proc.num_requested_topologies:
-    results.pop()
   return results
 
