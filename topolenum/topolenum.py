@@ -489,6 +489,41 @@ class TreeAssembly(object):
                            if i not in indeces_to_skip)
     return frozenset({new_clade,old_clades})
   
+  def best_case_with_extension(self,extension):
+    current_distances_to_root = {leaf:clade.trace_dist(leaf) for clade in self.built_clades
+                                 for leaf in clade.leaf_names}
+    pairs_accounted_for = {frozenset(pair) for clade in self.built_clades
+                           for pair in itertools.combinations(clade.leaf_names,2)}
+    try:
+      new_distances_to_root = {leaf:(current_distances_to_root[leaf]+1 if leaf in
+                                     current_distances_to_root else 1)
+                               for pair in extension.consistent for leaf in pair}
+      for leaf in current_distances_to_root:
+        if leaf not in new_distances_to_root:
+          new_distances_to_root[leaf] = current_distances_to_root[leaf]
+      for pair in extension.consistent:
+        pairs_accounted_for.add(pair)
+    except AttributeError:
+      new_distances_to_root = dict(current_distances_to_root.iteritems())
+      for leaf in extension.leaves:
+        new_distances_to_root[leaf] = 1
+      pairs_accounted_for.add(extension.leaves)
+    
+    try:
+      best_possible_final_score = self.score + extension.score
+    except AttributeError:
+      best_possible_final_score = self.score + math.log(extension.freq)
+    for pair,histogram in self.pwdist_histograms_dict.items():
+      if pair not in pairs_accounted_for:
+        min_dist = sum(new_distances_to_root[leaf] if leaf in new_distances_to_root else
+                       0 for leaf in pair)+1
+        acceptable_dist_freqs = [freq for dist,freq in histogram.items() if dist >= min_dist]
+        if acceptable_dist_freqs:
+          best_possible_final_score += math.log(max(acceptable_dist_freqs))
+        else:
+          return None
+    return best_possible_final_score
+  
   def filter_proposed_extensions(self,new_pairs,joins,attachments,
                                  previously_seen,min_score=None):
     joins = self.verify_remaining_proposed_pairs(joins)
