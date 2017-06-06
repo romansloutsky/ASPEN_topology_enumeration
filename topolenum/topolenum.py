@@ -580,7 +580,7 @@ class TreeAssembly(object):
       if pair.dist == 1:
         # Pairs with distance 1 are added w/o questions. If continue with this path,
         # later we will make sure to remove from consideration all pairs that conflict this.
-        new_pairs[pair.leaves] = pair
+        new_pairs[i] = pair
       elif not pair.leaves & already_connected_splat:
         # If a pair has distance > 1 and neither leaf in pair has already been added to a
         # clade, then we can't do anything with it, so we silently skip it
