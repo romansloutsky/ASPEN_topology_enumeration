@@ -517,7 +517,7 @@ class TreeAssembly(object):
                            if i not in indeces_to_skip)
     return frozenset({new_clade,old_clades})
   
-  def find_extensions(self,previously_seen={},min_score=None):
+  def find_extensions(self,previously_seen=set(),min_score=None):
     new_pairs = {}
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
     attachments = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
