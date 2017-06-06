@@ -465,6 +465,18 @@ class TreeAssembly(object):
     joins = self.verify_remaining_proposed_pairs(joins)
     attachments = self.verify_remaining_proposed_pairs(attachments)
     
+    # Order of further checks:
+    # 1. Is min_score defined? Do remaining proposed extensions meet it?
+    # 2. Are remaining proposed extensions in previously_seen?
+    #    If yes, abandon, if not, add.
+    # 3. Are remaining proposed extensions viable via look_ahead?
+    #    This includes BOTH future score comparison to min_score and check whether
+    #    extension of this extension to full tree is possible. Since the first
+    #    requires min_score to be defined, while the second can always be performed,
+    #    maybe they should be split?
+    
+    return new_pairs,joins,attachments
+  
   def find_extensions(self,previously_seen,min_score=None):
     new_pairs = []
     joins = self.KeyPassingDefaultDict(lambda key: ProposedExtension(*key))
