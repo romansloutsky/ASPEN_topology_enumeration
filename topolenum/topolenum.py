@@ -353,6 +353,7 @@ class ProposedExtension(object):
     # - actually construct new clade
     # - pop existing clade(s) from assemblyobj.built_clades
     # - pop inconsistent pairs from assemblyobj.constraints_idx
+    assert not self.unverified
     if hasattr(self,'new_leaf'):
       assert set(self.built_clade.clade.leaf_names) ==\
               set(assemblyobj.built_clades[self.built_clade.index].leaf_names)
@@ -419,6 +420,8 @@ class TreeAssembly(object):
         if self.pwdist_histograms_dict[pair][dist] < self.abs_cutoff:
           extensions.pop(key)
           break
+        else:
+          ext.unverified.pop(pair)
     return extensions
   
   def find_extensions(self):
