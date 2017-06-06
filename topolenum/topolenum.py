@@ -356,31 +356,26 @@ class ProposedExtension(object):
     # - pop existing clade(s) from assemblyobj.built_clades
     # - pop inconsistent pairs from assemblyobj.constraints_idx
     assert not self.unverified
-    # Pop constraint pairdists we are accounting for with this extension from the list
-    # of assemblyobj's constraints 
-    for pair in sorted(self.consistent.itervalues(),key=lambda x: x.index,reverse=True):
-      assemblyobj.constraints_idx.pop(pair.index)
-    # Also pop constraint pairdists inconsistent with this extension, since they can't
-    # be used in future extensions anyway
-    for index in sorted(self.inconsistent.iterkeys(),reverse=True):
-      assemblyobj.constraints_idx.pop(index)
+    
+    # Assemble for removal from constraints_idx indeces of consistent and inconsistent pairdists
+    drop_these = [pair.index for pair in self.consistent.values()]+self.inconsistent.keys()
     if hasattr(self,'new_leaf'):
       assert set(self.built_clade.clade.leaf_names) ==\
               set(assemblyobj.built_clades[self.built_clade.index].leaf_names)
-      # One more thing to if this extension is an attachment of a new leaf:
-      # Pop constraint pairdists where the new leaf has distance 1 with any other leaf,
-      # regardless of whether the other leaf is involved in this extension. All such
-      # constraint distances are inconsistent with this extension. This additional check
-      # is necessary because of the special way new pair extensions are handled - with
+      # One more thing to do if this extension is an attachment of a new leaf:
+      # Add for removal constraint pairdists where the new leaf has distance 1 with any
+      # other leaf, regardless of whether the other leaf is involved in this extension.
+      # All such constraint distances are inconsistent with this extension. This additional
+      # check is necessary because of the special way new pair extensions are handled - with
       # no questions asked.
-      drop_these = [i for i in assemblyobj.constraints_idx
-                   if self.new_leaf in assemblyobj.constraints_master[i].leaves and
-                                        assemblyobj.constraints_master[i].dist == 1]
-      assemblyobj.constraints_idx = filter(lambda x: x not in drop_these,
-                                                          assemblyobj.constraints_idx)
+      drop_these.extend([i for i in assemblyobj.constraints_idx
+                         if self.new_leaf in assemblyobj.constraints_master[i].leaves and
+                                             assemblyobj.constraints_master[i].dist == 1])
     else:
       assert all(set(c.clade.leaf_names)==set(assemblyobj.built_clades[c.index].leaf_names)
                                                             for c in self.clades)
+    assemblyobj.constraints_idx = filter(lambda x: x not in drop_these,
+                                         assemblyobj.constraints_idx)
 
 
 class TreeAssembly(object):
