@@ -365,6 +365,7 @@ class ProposedExtension(object):
     # the original that are stored in self.clades
     if hasattr(self,'new_leaf'):
       built_clade = assemblyobj.built_clades.pop(self.built_clade.index)
+      assemblyobj.free_leaves.remove(self.new_leaf)
       assert set(self.built_clade.clade.leaf_names) == set(built_clade.leaf_names)
       new_clades_attr = [built_clade.wrapped,Clade(name=self.new_leaf)]
       # One more thing to do if this extension is an attachment of a new leaf:
@@ -436,7 +437,7 @@ class TreeAssembly(object):
     #===========================================================================
     
     self.built_clades = []
-    self.free_leaves = leaves_to_assemble
+    self.free_leaves = set(leaves_to_assemble)
     self.constraints_idx = range(len(self.constraints_master))
     self.score = 0.0
   
@@ -636,6 +637,10 @@ class TreeAssembly(object):
         drop_these.append(idx_of_pair) # Finally, select for dropping this pair
         # Drop selected pairs from constraints_idx
         build_in.constraints_idx = filter(lambda x: x not in drop_these,build_in.constraints_idx)
+        
+        # Remove leaves in this pair from free_leaves
+        for leaf in pair.leaves:
+          build_in.free_leaves.remove(leaf) # Pop each leaf in pair from free_leaves
         
         # Build new clade and update the score
         build_in.built_clades.append(T(Clade(clades=[Clade(name=leaf) for leaf in pair.leaves])))
