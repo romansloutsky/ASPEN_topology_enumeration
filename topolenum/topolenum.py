@@ -465,7 +465,7 @@ class TreeAssembly(object):
     joins = self.verify_remaining_proposed_pairs(joins)
     attachments = self.verify_remaining_proposed_pairs(attachments)
     
-    for extension_set in (new_pairs,joins.attachments):
+    for extension_set in (new_pairs,joins,attachments):
       for key,extension in extension_set.items():
         if min_score is not None:
           try: # Will fail is item is a new pair - forgiveness faster than permission
@@ -487,6 +487,35 @@ class TreeAssembly(object):
     #    maybe they should be split?
     
     return new_pairs,joins,attachments
+  
+  def as_nested_sets(self,extension):
+    # Clades are represented by {clade.nested_set_repr(),'r'} (r for root) to indicate
+    # their free-standing nature. This way {{clade1,'r'},{clade2,'r'}} represents two
+    # free-standing clades, distinct from {clade1,clade2}, representing a single
+    # free-standing clade (or tree) with two sub-clades.
+    if hasattr(extension,'freq'):
+      new_clade = frozenset({frozenset(extension.leaves),'r'})
+      indeces_to_skip = []
+    elif hasattr(extension,'built_clade'):
+      new_clade = frozenset({frozenset({extension.built_clade.clade.nested_set_repr(),
+                                        extension.new_leaf}),'r'})
+      indeces_to_skip = {extension.built_clade.index}
+    else:
+      new_clade = frozenset({frozenset(c.clade.nested_set_repr()
+                                       for c in extension.clades),
+                             'r'})
+      indeces_to_skip = {c.index for c in extension.clades}
+    
+    try:
+      current_clades = self._nested_set_reprs
+    except AttributeError:
+      self._nested_set_reprs = [frozenset({c.nested_set_repr(),'r'})
+                                for c in self.built_clades]
+      current_clades = self._nested_set_reprs
+    
+    old_clades = frozenset(c for i,c in enumerate(current_clades)
+                           if i not in indeces_to_skip)
+    return frozenset({new_clade,old_clades})
   
   def find_extensions(self,previously_seen={},min_score=None):
     new_pairs = {}
