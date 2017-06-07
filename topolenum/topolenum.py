@@ -642,6 +642,17 @@ class TreeAssembly(object):
         build_in.score += math.log(pair.freq)
         updated_assemblies.append(build_in)
     return updated_assemblies
+  
+  def generate_extensions(self,encountered_assemblies,min_score=None):
+    new_pairs,joins,attachments = self.find_extensions(encountered_assemblies,min_score=None)
+    if any((new_pairs,joins,attachments)):
+      # Just a placeholder call to a stub of a function right now: not sure what and how it will return
+      self.build_extensions(new_pairs, joins, attachments)
+      # Return built extensions and any additional information
+    else:
+      # Somehow inform caller that this assembly is unextendable - it is the caller's responsibility to
+      # remove this assembly from the container of active assemblies
+      pass
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
