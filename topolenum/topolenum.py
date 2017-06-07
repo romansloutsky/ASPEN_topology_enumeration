@@ -4,6 +4,9 @@ from collections import defaultdict,namedtuple,Counter
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tree import T
 
+#===============================================================================
+# Bugfixes on this branch
+#===============================================================================
 
 LPDF = namedtuple('LeafPairDistanceFrequency',['leaves','dist','freq'])
 
@@ -177,6 +180,11 @@ class TreeAssembly(object):
         else:
           ext.score += math.log(pair_freq)
           ext.unverified.pop(pair)
+      else:
+        # If all unverified pairs check out, make sure this extension is not passing
+        # this filter entirely on the strength of pairs we just verified
+        if not ext.consistent:
+          extensions.pop(key)
     return extensions
   
   def as_nested_sets(self,extension):
