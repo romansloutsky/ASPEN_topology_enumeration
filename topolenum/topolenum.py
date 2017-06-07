@@ -1,6 +1,6 @@
 import copy,math,itertools
 from sys import stderr
-from collections import defaultdict,namedtuple
+from collections import defaultdict,namedtuple,Counter
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tree import T
 
@@ -652,6 +652,111 @@ class TreeAssembly(object):
       # Somehow inform caller that this assembly is unextendable - it is the caller's responsibility to
       # remove this assembly from the container of active assemblies
       return None
+
+def prepare_assemblies_for_iteration(accepted_assemblies,num_requested_trees,assemblies_workspace,
+                                     processing_bite_size,iternum):
+  # If we don't yet have a sufficient number of completed assemblies, then we can't filter proposed
+  # extensions on min_score, reducing the efficiency of our search. So we need to hurry up and
+  # complete at least as many assemblies as have been requested. If we are already working on more
+  # that requested number of assemblies, we'll sort them to bring the most likely to get finished
+  # first to the front and work this iteration only on as many as were requested to speed up iterations
+  # until we have accepted enough trees.
+  special_sort1 = lambda x: (len(x.free_leaves),sum((2*c.count_terminals()-1)/2
+                            for c in x.built_clades)/x.score)
+  special_sort2 = lambda x: sum((2*c.count_terminals()-1)/2 for c in x.built_clades)/x.score
+  if len(accepted_assemblies) < num_requested_trees and len(assemblies_workspace) > num_requested_trees:
+    # Sorting 1) by number of attached leaves, then 2) by avg score of pairwise distance of all pairs
+    # of attached leaves where both are attached under common root.
+    return sorted(assemblies_workspace,key=special_sort1)[:num_requested_trees]
+  # If sufficient number have been accepted:
+  elif len(accepted_assemblies) >= num_requested_trees:
+    # On every second iteration sort only on avg score of pw distances disregarding the number of remaining
+    # leaves, but take the full set of working assemblies or processing_bite_size many assemblies, whichever
+    # one is smaller.
+    if iternum % 2 == 0:
+      return sorted(assemblies_workspace,key=special_sort1)[:processing_bite_size]
+    else:
+      # On every sixth iteration sort in avg score order, disregarding the number of remaining leaves, and
+      # reverse to let the laggers at the end catch up, but only take half as many assemblies to work on.
+      if iternum % 3 == 0:
+        return sorted(assemblies_workspace,key=special_sort2,
+                      reverse=True)[:processing_bite_size/2]
+      # Remaining one third of iterations sort in avg score order and take processing_bite_size many assemblies.
+      else:
+        return sorted(assemblies_workspace,key=special_sort2)[:processing_bite_size]
+  else:
+    return assemblies_workspace
+
+def assembly_iteration_new(assemblies_workspace,completed_assemblies,accepted_assemblies,
+                           encountered_assemblies,num_requested_trees,processing_bite_size,
+                           iternum):
+  added_this_iteration = 0
+  completed_this_iteration = 0
+  discarded_this_iteration = Counter()
+  
+  work_on_this_iteration = prepare_assemblies_for_iteration(accepted_assemblies, num_requested_trees,
+                                                            assemblies_workspace, processing_bite_size,
+                                                            iternum)
+  
+  print >>stderr, len(assemblies_workspace),"tracked trees,",len(completed_assemblies),"completed, working on",\
+                  len(work_on_this_iteration),"this iteration, total of",\
+                  len(assemblies_workspace)-len(accepted_assemblies)+len(completed_assemblies),"are incomplete"
+  
+  assemblies_per_dot = int(math.ceil(float(len(work_on_this_iteration))/50))
+  for i,assembly in enumerate(work_on_this_iteration):
+    print >>stderr,'['+'|'*(i % 10)+' '*(9-(i % 10))+']'+'['+'*'*(i/assemblies_per_dot)+' '*(50-i/assemblies_per_dot)+']'+\
+                        '\taccepted:',accepted_this_iteration,'discarded:',sum(v for v in discarded_this_iteration.values()),\
+                        'new:',added_this_iteration,'\r',
+    
+    if len(accepted_assemblies) >= num_requested_trees:
+      extended_assemblies = assembly.generate_extensions(encountered_assemblies,
+                                                         min_score=accepted_assemblies[-1].score)
+    else:
+      extended_assemblies = assembly.generate_extensions(encountered_assemblies)
+    
+    added_this_iteration += len(extended_assemblies)-1
+    drop_these = []
+    for j,ext_assembly in enumerate(extended_assemblies):
+      if ext_assembly.complete:
+        completed_this_iteration += 1
+        drop_these.append(j)
+        accepted_assemblies.append(ext_assembly)
+        accepted_assemblies = sorted(accepted_assemblies,key=lambda x: x.score,reverse=True)
+        if len(accepted_assemblies) > num_requested_trees:
+          assert len(accepted_assemblies)-1 == num_requested_trees
+          completed_assemblies.append(accepted_assemblies.pop())
+    for j in drop_these[::-1]:
+      extended_assemblies.pop(j)
+    
+    if extended_assemblies:
+      if extended_assemblies[-1] is assembly:
+        assemblies_workspace.extend(extended_assemblies[:-1])
+      else:
+        assemblies_workspace.extend(extended_assemblies)
+  
+  return accepted_assemblies
+    
+
+def assemble_trees(pwleafdist_histograms,leaves_to_assemble,num_requested_trees=1000,
+                   constraint_freq_cutoff=0.9,num_iter=10,processing_bite_size=10000,
+                   absolute_freq_cutoff=0.01):
+  # Init parent of all assemblies
+  assemblies_workspace = [TreeAssembly(pwleafdist_histograms,constraint_freq_cutoff,
+                                       leaves_to_assemble,absolute_freq_cutoff)]
+  accepted_assemblies = []
+  completed_assemblies = []
+  encountered_assemblies = set()
+  iterations = 0
+  enough_assemblies_accepted = False
+  while assemblies_workspace and iterations < num_iter:
+    assembly_iteration_new()
+    # Some handling of completed assemblies needs to happen
+    
+    # Did we reach the requested number of assemblies on this iteration?
+    if not enough_assemblies_accepted and len(completed_assemblies) >= num_requested_trees:
+      
+      enough_assemblies_accepted = True
+    iterations += 1
 
 def assemble_histtrees(pwhist,leaves_to_assemble,num_requested_trees=1000,freq_cutoff=0.9,max_iter=100000,processing_bite_size=10000):
     pwindiv = [(pair[0],score) for pair in [(f,[dd for i,dd in enumerate(ds)
