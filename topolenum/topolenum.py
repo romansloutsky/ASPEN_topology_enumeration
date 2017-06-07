@@ -5,6 +5,10 @@ from StringIO import StringIO
 from Bio.Phylo.BaseTree import Tree, Clade
 from .tree import T
 
+#-------------------------------------------------------------------------------------------------------------
+# Working version of tree building procedure implementation, as it was first moved into repo
+#-------------------------------------------------------------------------------------------------------------
+
 def check_against_histograms(extensions,pwhistdict,freq_cutoff=0.01):
     good_extensions = {}
     if all(any(isinstance(f,str) for f in ext) for ext in extensions):
@@ -194,7 +198,7 @@ def assembly_iteration(assemblies,pairs_master,pwhistdict,accepted_assemblies,en
             if la is None:
                 discarded_this_iteration['e'].append(assemblies.pop(assemblies.index(assembly)))
                 encountered_leaf_subsets.add(frozenset({frozenset({frozenset(n.leaf_names) for n in T(c).get_nonterminals()}) for c in assembly[0]}))
-                still_in_play
+                still_in_play = False
             elif len(accepted_assemblies) == num_requested_trees and la < accepted_assemblies[-1][4]:
                 discarded_this_iteration['ps'].append(assemblies.pop(assemblies.index(assembly)))
                 encountered_leaf_subsets.add(frozenset({frozenset({frozenset(n.leaf_names) for n in T(c).get_nonterminals()}) for c in assembly[0]}))
