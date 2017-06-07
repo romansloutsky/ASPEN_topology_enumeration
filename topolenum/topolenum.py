@@ -847,15 +847,20 @@ class AssemblyWorkspace(object):
     self.rejected_assemblies = []
     self.encountered_assemblies = encountered_assemblies_storage
     
-    self.num_leaves = len(seed_assembly.leaves_master)
     self.num_requested_trees = num_requested_trees
     self._reached_num_requested_trees = False
     if track_min_score:
       self.curr_min_score = None
     self.max_workspace_size = max_workspace_size
+    self.current_max = 10
+    self.new_assembly_cache = []
     self.fifo = fifo
     
+    self.push_cache = []
     self.iternum = 1
+    self.num_total_pairs = len(seed_assembly.pwdist_histograms_dict)
+    self.push_count = 1 # "Pseudocount" to avoid division by 0
+    self.topoff_count = 0
     self.topoff_param1 = 1
     self.topoff_param2 = 1
   
@@ -872,38 +877,48 @@ class AssemblyWorkspace(object):
     else:
       return False
   
-  def apply_acceptance_logic_to_popped_assembly(self,popped,min_leaf_count,
+  @property
+  def acceptance_criterion(self):
+    ratio = float(self.topoff_count)/self.push_count
+    if ratio > 1.0:
+      return 0
+    elif ratio < 0.1:
+      return self.num_total_pairs*0.9
+    else:
+      return self.num_total_pairs*(1-ratio/2)
+  
+  def apply_acceptance_logic_to_popped_assembly(self,popped,
                                                      rejected_assemblies,
                                                      counter):
     if popped.score > self.curr_min_score:
-      if sum(c.count_terminals() for c in popped.built_clades) >= min_leaf_count:
+      self.topoff_count += 1
+      # Check assemblies extension prospects here - no need to try extending it
+      # if they are bad
+      if len(popped.pairs_accounted_for) >= self.acceptance_criterion:
         self.workspace.append(popped)
       else:
         counter[0] += 1
         rejected_assemblies.append(popped)
   
-  def fill_workspace_from_fifo(self,max_size,min_leaf_count,
-                                    rejected_assemblies,
-                                    counter):
+  def fill_workspace_from_fifo(self,max_size,rejected_assemblies,counter):
     while len(self.workspace) < max_size and counter[0] < 100:
       popped = self.fifo.pop()
       if popped is None:
         break
       else:
         popped = TreeAssembly.uncompress(popped)
-        self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
+        self.apply_acceptance_logic_to_popped_assembly(popped,
                                                        rejected_assemblies,
                                                        counter)
   
-  def top_off_workspace(self,max_size=None,min_leaf_count=None):
+  def top_off_workspace(self,max_size=None):
     if self.fifo is None or isinstance(self.fifo,str):
       return
     max_size = max_size or self.max_workspace_size
-    min_leaf_count = min_leaf_count or 0
     while len(self.workspace) < max_size:
       counter = [0]
       rejected = []
-      self.fill_workspace_from_fifo(max_size,min_leaf_count,rejected,counter)
+      self.fill_workspace_from_fifo(max_size,rejected,counter)
       self.push_to_fifo(rejected)
       if counter[0] < 100:
         break
@@ -916,104 +931,68 @@ class AssemblyWorkspace(object):
     for item in push_these:
       self.fifo.push(item.compress())
   
-  def assembly_stats(self,assemblies=None):
-    if assemblies is None:
-      assemblies = self.workspace
-    leafcounts = [sum(c.count_terminals() for c in a.built_clades)
-                  for a in assemblies]
-    ratios = [a.score/count for a,count in zip(assemblies,leafcounts)]
-    return leafcounts,ratios
+  def purge_push_cache(self):
+    self.push_to_fifo(self.push_cache)
+    self.push_cache = []
   
-  def load_assemblies_into_workspace(self,assemblies,max_size=None):
-    if max_size is None:
-      max_size = self.max_workspace_size
-    while len(self.workspace) < max_size:
-      try:
-        self.workspace.append(assemblies.pop())
-      except IndexError:
-        break
-    if assemblies:
-      self.push_to_fifo(assemblies)
+  def push(self,*args):
+    self.push_cache.extend(args)
+    if len(self.push_cache) > 100:
+      self.purge_push_cache()
+    self.push_count += len(args)
+  
+  def sock_away_extras(self,too_many_here,max_size=None):
+    max_size = max_size or self.max_workspace_size
+    while len(too_many_here) > max_size:
+      self.push(too_many_here.pop())
   
   def update_workspace(self,new_assemblies):
-    if not self.reached_num_requested_trees and new_assemblies:
-      # Until requested number of trees have been completed, only keep some of
-      # the new assemblies - the ones with the highest score/leaves ratio
-      leafcounts,ratios = self.assembly_stats(new_assemblies)
-      if self.iternum == 1:
-        # On first iteration seed the workspace with 9 best assemblies,
-        # in addition to the one that got extended in place, for a total of 10.
-        self.load_assemblies_into_workspace(
-                             [a for r,a in sorted(zip(ratios,new_assemblies))],
-                                            min(self.max_workspace_size,10))
-      elif min(leafcounts) < self.num_leaves*0.8:
-        # If past the first assembly, but still early on (fewer than half of
-        # all leaves have been attached to any of the assemblies in the
-        # workspace), put only the best new assembly in the workspace and the
-        # rest in the FIFO. In addition to the one that was extended in place,
-        # this will add one new assembly to the workspace, doubling the
-        # workspace over the course of the iteration. If leafcounts are still
-        # less than half of all leaves for all assemblies in the workspace at
-        # the end of the iteration, the workspace will be reduced to the 10
-        # best assemblies.
-        self.workspace.append(new_assemblies.pop(max(((i,r) for i,r in
-                                                      enumerate(ratios)),
-                                                     key=lambda (i,r): r)[0]))
-        self.push_to_fifo(new_assemblies)
-      else:
-        # If requested number of trees has not been reached, but not the first
-        # iteration and at least one new assembly has more than half of all
-        # leaves attached, put them all in the workspace until it reaches 100.
-        self.load_assemblies_into_workspace(new_assemblies,
-                                            min(self.max_workspace_size,100))
-    elif new_assemblies:
-      # Otherwise fill workspace to max_workspace_size
-      self.load_assemblies_into_workspace(new_assemblies)
+    self.new_assembly_cache.extend(new_assemblies)
+    self.new_assembly_cache.sort(key=lambda a:\
+                                            a.score/len(a.pairs_accounted_for),
+                                 reverse=True)
+    max_size = self.max_workspace_size if self.reached_num_requested_trees\
+                                                          else self.current_max
+    if len(self.new_assembly_cache) > max_size:
+      self.sock_away_extras(self.new_assembly_cache,max_size)
   
   def finalize_workspace(self):
+    self.workspace.extend(self.new_assembly_cache)
+    self.workspace.sort(key=lambda a: a.score/len(a.pairs_accounted_for),
+                        reverse=True)
+    self.new_assembly_cache = []
     if not self.reached_num_requested_trees:
       if self.workspace:
-        # Try to finish assembly of the requested number of trees ASAP:
-        # Work only a limited number of the most promising assemblies, assessed
-        # by ratio of score to number of leaves attached to all built clades
-        # (i.e. the average score contribution of each attached leaf)
-        leafcounts,ratios = self.assembly_stats()
-        self.workspace = [a for r,a in sorted(zip(ratios,self.workspace),
-                                              reverse=True)]
-        # If assembly is in early stages (fewer than half of all leaves have been
-        # attached to any of the assemblies in the workspace), keep the workspace
-        # really small (10), since each assembly will likely give rise to many
-        # complete trees. Otherwise keep the workspace moderately small (100).
-        # Of course, if the requested max_workspace_size is smaller than either
-        # value, use the requested size instead of that value.
-        current_max = 10 if min(leafcounts) < self.num_leaves*0.8 else 100
-        # Put remaining assemblies into the FIFO to deal with later
-        sock_away = []
-        while len(self.workspace) > min(self.max_workspace_size,current_max):
-          sock_away.append(self.workspace.pop())
-        if sock_away:
-          self.push_to_fifo(sock_away)
-        elif len(self.workspace) < min(self.max_workspace_size,current_max):
-          self.top_off_workspace(min(self.max_workspace_size,current_max),
-                                 self.num_leaves*0.8)
+        small_wksp_criterion = min(len(a.pairs_accounted_for)
+                                   for a in self.workspace) <\
+                                            self.num_total_pairs*0.75
       else:
-        self.top_off_workspace(10)
+        small_wksp_criterion = True
+      self.current_max = 10 if small_wksp_criterion\
+                                            else min(self.max_workspace_size,
+                                                     100)
+      if len(self.workspace) > self.current_max:
+        self.sock_away_extras(self.workspace,self.current_max)
+      if len(self.workspace) < self.max_workspace_size:
+        self.top_off_workspace(self.current_max)
     else:
-      if not self.workspace:
-        self.top_off_workspace(max_size=min(self.max_workspace_size,max(10,
-                               self.max_workspace_size/(50*max(0.02,
-                                                            (self.topoff_param1/
+      self.current_max = min(self.max_workspace_size,max(10,
+                             self.max_workspace_size/(50*max(0.02,
+                                                           (self.topoff_param1/
                                                             self.topoff_param2)
-                                                               )
-                                                            )
-                                                                        )
-                                            )
-                               )
-        self.topoff_param1 = 1.0
-        self.topoff_param2 += 5.0
-      else:
+                                                                           ))))
+      if self.workspace:
+        if len(self.workspace) > self.max_workspace_size:
+          self.sock_away_extras(self.workspace)
+        if len(self.workspace) < self.max_workspace_size:
+          self.top_off_workspace()
         self.topoff_param1 += 1.0
         self.topoff_param2 = max(1.0,self.topoff_param2 - 1.0)
+      else:
+        self.top_off_workspace(self.current_max)
+        self.topoff_param1 = 1.0
+        self.topoff_param2 += 5.0
+    self.purge_push_cache()
   
   def check_completion_status(self,assembly):
     if assembly.complete:
@@ -1209,8 +1188,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def curr_min_score(self):
     return self._curr_min_score.value
   
-  def fill_workspace_from_fifo(self,max_size,min_leaf_count,
-                                    rejected_assemblies,counter):
+  def fill_workspace_from_fifo(self,max_size,rejected_assemblies,counter):
     while len(self.workspace) < max_size and counter[0] < 100:
       try:
         pickled_assembly = self.queue.get_nowait()
@@ -1226,7 +1204,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
             else:
               continue
       popped = TreeAssembly.uncompress(pickled_assembly)
-      self.apply_acceptance_logic_to_popped_assembly(popped,min_leaf_count,
+      self.apply_acceptance_logic_to_popped_assembly(popped,
                                                      rejected_assemblies,
                                                      counter)
   
@@ -1395,7 +1373,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
                          for a in old_a.generate_extensions(
                                   SharedCladeReprTracker(self.leaves,
                                             self.encountered_assemblies_dict))]
-  
+    seed_assemblies.sort(key=lambda a: a.score/len(a.pairs_accounted_for))
     workspace_args = namedtuple('ArgsKwargs',
                                 ['args','kwargs'])((self.leaves,),
                                                    {'num_requested_trees':
