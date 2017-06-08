@@ -1218,13 +1218,16 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     currscore = 'min_score='+repr(None) if currscore == -sys.float_info.max\
                                            else "min_score=%0.5f" % currscore
     iternum = "iter="+str(self.iternum)
+    pushcount = "push_count="+str(self.push_count)
+    topoffcount = "topoff_count="+str(self.topoff_count)
+    criterion = "criterion=%0.2f" % self.acceptance_criterion
     if proc_stamp:
-      stamp = 'STAMP: '+' '.join([multiprocessing.current_process().name,
-                                  'time='+self.time_stamp,
-                                  currscore,iternum])+'   '
+      stamp = 'STAMP: '+'  '.join([multiprocessing.current_process().name,
+                                  'time='+self.time_stamp,currscore,iternum,
+                                  pushcount,topoffcount,criterion])+'   '
     else:
-      stamp = 'STAMP: '+' '.join(['time='+self.time_stamp,
-                                  currscore,iternum])+'   '
+      stamp = 'STAMP: '+'  '.join(['time='+self.time_stamp,currscore,iternum,
+                                  pushcount,topoffcount,criterion])+'   '
     if assembly is None:
       print >>self.monitor,stamp,message
     else:
