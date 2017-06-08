@@ -903,18 +903,16 @@ class AssemblyWorkspace(object):
                                                      counter):
     if popped[2] > self.curr_min_score:
       self.topoff_count += 1
-      # Check assemblies extension prospects here - no need to try extending it
-      # if they are bad
       if popped[3] >= self.acceptance_criterion:
         uncompressed_assembly = TreeAssembly.uncompress(popped)
         self.log("TopoffAccepted",uncompressed_assembly)
         self.workspace.append(uncompressed_assembly)
       else:
-        self.log("TopoffPostponed",popped)
+        self.log("TopoffPostponed",popped,compressed=True)
         counter[0] += 1
         rejected_assemblies.append(popped)
     else:
-      self.log("TopoffRejected",popped)
+      self.log("TopoffRejected",popped,compressed=True)
   
   def fill_workspace_from_fifo(self,max_size,rejected_assemblies,counter):
     while len(self.workspace) < max_size and counter[0] < 100:
@@ -1229,7 +1227,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   def time_stamp(self):
     return "%0.5f" % (time.time()-self.start_time.value)
   
-  def log(self,message,assembly=None,proc_stamp=True):
+  def log(self,message,assembly=None,proc_stamp=True,compressed=False):
     currscore = self.curr_min_score
     currscore = 'min_score='+repr(None) if currscore == -sys.float_info.max\
                                            else "min_score=%0.5f" % currscore
@@ -1246,13 +1244,15 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
                                   pushcount,topoffcount,criterion])+'   '
     if assembly is None:
       print >>self.monitor,stamp,message
+    elif compressed:
+      print >>self.monitor,stamp,"\t%0.5f\t" % assembly[1],assembly[2],'\t'+message
     else:
-      print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
-                              "\t",len(assembly.pairs_accounted_for),\
-                              "\t%0.5f" % (assembly.score/len(
+      print >>self.monitor,stamp,"\t%0.5f\t" % assembly.score,\
+                                 len(assembly.pairs_accounted_for),\
+                                 "\t%0.5f" % (assembly.score/len(
                                  assembly.pairs_accounted_for)),'\t'+message,\
-                                self.encountered_assemblies.make_str_repr(
-                                      assembly.current_clades_as_nested_sets)
+                                 self.encountered_assemblies.make_str_repr(
+                                       assembly.current_clades_as_nested_sets)
   
   def fill_workspace_from_fifo(self,max_size,rejected_assemblies,counter):
     while len(self.workspace) < max_size and counter[0] < 100:
@@ -1275,7 +1275,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   
   def push_to_fifo(self,push_these):
     for item in push_these:
-      self.log("Pushing",item)
+      self.log("Pushing",item,compressed=True)
     self.fifo.push_all(item for item in push_these)
   
   def check_completion_status(self,assembly):
