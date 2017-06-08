@@ -942,6 +942,8 @@ class AssemblyWorkspace(object):
   
   def push(self,*args):
     self.push_cache.extend(args)
+    for assembly in args:
+      self.log("CachedToPush",assembly)
     if len(self.push_cache) > 100:
       self.purge_push_cache()
     self.push_count += len(args)
@@ -952,6 +954,8 @@ class AssemblyWorkspace(object):
       self.push(too_many_here.pop())
   
   def update_workspace(self,new_assemblies):
+    for assembly in new_assemblies:
+      self.log("CachedNewAssembly",assembly)
     self.new_assembly_cache.extend(new_assemblies)
     self.new_assembly_cache.sort(key=lambda a:\
                                             a.score/len(a.pairs_accounted_for),
@@ -1025,6 +1029,7 @@ class AssemblyWorkspace(object):
       extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
                                                          self.curr_min_score)
       if extended_assemblies is None:
+        self.log("Abandoned",assembly)
         drop_from_workspace_idx.append(i)
         continue
       else:
