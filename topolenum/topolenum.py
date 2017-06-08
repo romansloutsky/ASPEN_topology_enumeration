@@ -878,14 +878,14 @@ class AssemblyWorkspace(object):
                                                      counter):
     if popped.score > self.curr_min_score:
       if sum(c.count_terminals() for c in popped.built_clades) >= min_leaf_count:
-        self.log("TopoffAccepted "+str(popped.score),popped)
+        self.log("TopoffAccepted",popped)
         self.workspace.append(popped)
       else:
-        self.log("TopoffPostponed "+str(popped.score),popped)
+        self.log("TopoffPostponed",popped)
         counter[0] += 1
         rejected_assemblies.append(popped)
     else:
-      self.log("TopoffRejected "+str(popped.score),popped)
+      self.log("TopoffRejected",popped)
   
   def fill_workspace_from_fifo(self,max_size,min_leaf_count,
                                     rejected_assemblies,
@@ -1030,7 +1030,7 @@ class AssemblyWorkspace(object):
           self.rejected_assemblies.append(self.accepted_assemblies.pop())
         self.curr_min_score = self.accepted_assemblies[-1].score
       else:
-        self.log("CompleteRejected "+str(assembly.score),assembly)
+        self.log("CompleteRejected",assembly)
         self.rejected_assemblies.append(assembly)
       return
     else:
@@ -1042,7 +1042,7 @@ class AssemblyWorkspace(object):
     for i,assembly in enumerate(workspace_this_iter):
       if interrupt_callable():
         return
-      self.log("WorkingOn "+str(assembly.score),assembly)
+      self.log("WorkingOn",assembly)
       extended_assemblies = assembly.generate_extensions(self.encountered_assemblies,
                                                          self.curr_min_score)
       if extended_assemblies is None:
@@ -1243,10 +1243,12 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
     if assembly is None:
       print >>self.monitor,stamp,message
     else:
-      print >>self.monitor,stamp,message,self.encountered_assemblies.make_str_repr(
-                                            assembly.current_clades_as_nested_sets),'\t',\
-                                            len(assembly.built_clades),'\t',\
-                                            len(assembly.leaves_master)-len(assembly.free_leaves)
+      print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
+                              "\t",len(assembly.pairs_accounted_for),\
+                              "\t%0.5f" % (assembly.score/len(
+                                 assembly.pairs_accounted_for)),'\t'+message,\
+                                self.encountered_assemblies.make_str_repr(
+                                      assembly.current_clades_as_nested_sets)
   
   def fill_workspace_from_fifo(self,max_size,min_leaf_count,
                                     rejected_assemblies,counter):
@@ -1271,25 +1273,26 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
   
   def push_to_fifo(self,push_these):
     for item in push_these:
-      self.log("Pushing "+str(item.score),item)
+      self.log("Pushing",item)
+#     self.fifo.push_all(item for item in push_these)
     self.fifo.push_all(item.compress() for item in push_these)
   
   def check_completion_status(self,assembly):
     if assembly.complete:
       if assembly.score > self.curr_min_score:
-        self.log("CompleteAccepted "+str(assembly.score),assembly)
+        self.log("CompleteAccepted",assembly)
         self.score_submission_queue.put(assembly.score)
         self.accepted_assemblies.append(assembly)
         self.complete_trees_fh.write(str(assembly.score)+'\t'+assembly.built_clades[0].write('as_string','newick',plain=True))
       else:
-        self.log("CompleteRejected "+str(assembly.score),assembly)
+        self.log("CompleteRejected",assembly)
         self.rejected_assemblies.append(assembly)
       for i in xrange(len(self.accepted_assemblies)-1,-1,-1):
         if self.accepted_assemblies[i].score < self.curr_min_score:
           self.rejected_assemblies.append(self.accepted_assemblies.pop(i))
       return
     else:
-      self.log("Extended "+str(assembly.score),assembly)
+      self.log("Extended",assembly)
       return assembly
   
   def iterate(self,*args,**kwargs):
