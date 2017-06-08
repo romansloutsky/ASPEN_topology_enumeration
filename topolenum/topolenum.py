@@ -1314,7 +1314,7 @@ class WorkerProcAssemblyWorkspace(AssemblyWorkspace):
                                  "\t%0.5f\t" % (assembly[1]/assembly[3]),\
                                  message
     else:
-      best_case = best_case or assembly.best_case()
+      best_case = best_case or assembly.best_case
       print >>self.monitor,stamp,"\t%0.5f" % assembly.score,\
                                  "\t%0.5f\t" % best_case,\
                                  len(assembly.pairs_accounted_for),\
