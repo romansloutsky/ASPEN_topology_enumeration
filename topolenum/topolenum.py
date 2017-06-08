@@ -492,6 +492,23 @@ class TreeAssembly(object):
     clades.append(new_clade)
     return clades
   
+  def best_case(self,pairs_accounted_for=None,distances_to_root=None,
+                     score=None):
+    pairs_accounted_for = pairs_accounted_for or self.pairs_accounted_for
+    distances_to_root = distances_to_root or self.distances_to_root
+    best_possible_final_score = score or self.score
+    for pair,histogram in self.pwdist_histograms_dict.items():
+      if pair not in pairs_accounted_for:
+        min_dist = sum(distances_to_root[leaf] if leaf in distances_to_root else
+                       0 for leaf in pair)+1
+        acceptable_dist_freqs = [freq for dist,freq in histogram.items()
+                                 if dist >= min_dist]
+        if acceptable_dist_freqs:
+          best_possible_final_score += math.log(max(acceptable_dist_freqs))
+        else:
+          return None
+    return best_possible_final_score
+  
   def best_case_with_extension(self,extension):
     try:
       updated_distances_to_root = {leaf:(self.distances_to_root[leaf]+1 if leaf in
@@ -519,16 +536,9 @@ class TreeAssembly(object):
       best_possible_final_score = self.score + extension.score
     except AttributeError:
       best_possible_final_score = self.score + math.log(extension.freq)
-    for pair,histogram in self.pwdist_histograms_dict.items():
-      if pair not in updated_pairs_accounted_for:
-        min_dist = sum(updated_distances_to_root[leaf] if leaf in updated_distances_to_root else
-                       0 for leaf in pair)+1
-        acceptable_dist_freqs = [freq for dist,freq in histogram.items() if dist >= min_dist]
-        if acceptable_dist_freqs:
-          best_possible_final_score += math.log(max(acceptable_dist_freqs))
-        else:
-          return None
-    return best_possible_final_score
+    return self.best_case(updated_pairs_accounted_for,
+                          updated_distances_to_root,
+                          best_possible_final_score)
   
   def filter_proposed_extensions(self,new_pairs,joins,attachments,
                                  encountered,min_score=None):
