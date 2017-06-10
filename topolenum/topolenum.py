@@ -1534,12 +1534,13 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
         try:
           pickled_assembly = self.assembly_queue.get_nowait()
         except Queue.Empty:
-          print >>sys.stderr,self.name+':',"Got queue empty error",
+          print >>sys.stderr,self.name+':',"Got queue empty error, looking into it ...",
           try:
             pickled_assembly = self.assembly_queue.get(timeout=60)
             print >>sys.stderr,"fixed after a short wait, continuing"
           except Queue.Empty:
-            print >>sys.stderr,'\n'+self.name+':',"Got queue empty error after 60 second wait"
+            print >>sys.stderr,'\n'+self.name+':',"Got another queue empty error"\
+                               " after 60 second wait, done"
             break
         pickle.dump(pickled_assembly,wh,pickle.HIGHEST_PROTOCOL)
     with open('tmp_savedir/encountered_assemblies','w',0) as wh:
