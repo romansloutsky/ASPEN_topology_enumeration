@@ -1,5 +1,6 @@
 import sys
-import os.path
+import time
+import os
 import math
 import itertools
 import tempfile
@@ -9,10 +10,9 @@ import threading
 import Queue
 import gc
 import cPickle as pickle
-from sys import stderr
 from cStringIO import StringIO
 from collections import defaultdict,namedtuple,Counter,Hashable
-from Bio.Phylo.BaseTree import Tree, Clade
+from Bio.Phylo.BaseTree import Clade
 from .tempdir import TemporaryDirectory
 from .tree import T as T_BASE
 
@@ -112,6 +112,7 @@ class T(T_BASE):
       if top_level_call:
         return cls(cls._to_wrapped_map[clade_repr])
       else:
+        return cls._to_wrapped_map[clade_repr]
         return cls._to_wrapped_map[clade_repr]
     elif isinstance(clade_repr,str):
       leaf = Clade(name=clade_repr)
@@ -1435,7 +1436,7 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
     self.get_PIDs.close()
   
   def write_save(self):
-    import os,shutil
+    import shutil
     os.mkdir('tmp_savedir')
     with open('tmp_savedir/unfinished_assemblies','w',0) as wh:
       while True:
@@ -1499,7 +1500,6 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
           if len(self.accepted_scores) < self.num_requested_topologies\
                                   or proposed_score > self.accepted_scores[-1]:
             self.accepted_scores.append(proposed_score)
-            self.accepted_scores.sort(reverse=True)
             while len(self.accepted_scores) > self.num_requested_topologies:
               self.accepted_scores.pop()
             if len(self.accepted_scores) == self.num_requested_topologies:
@@ -1527,13 +1527,41 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
         if p.is_alive():
           p.terminate()
     
-    except Exception as e:
+    except Exception:
       for p in procs:
         p.shutdown.set()
         p.join(timeout=15)
         if p.is_alive():
           p.terminate()
       raise
+
+
+from sys import float_info,stderr
+
+
+class EnumerationObserver(object):
+  def __init__(self,terminator_file='stop_enumeration'):
+    self.terminator = terminator_file
+    self.old_min_score = -float_info.max
+    self.start_time = time.time()
+
+  def report_score(self,enum_proc):
+    if enum_proc.min_score.value > self.old_min_score:
+      self.old_min_score = enum_proc.min_score.value
+      print >>stderr,"New worst score accepted at "+\
+                     "%0.5f" % (time.time()-self.start_time)+":",\
+                     self.old_min_score
+  
+  def proceed_permission_check(self):
+    if self.terminator in os.listdir('.'):
+      os.remove(self.terminator)
+      return False
+    else:
+      return True
+    
+  
+  def __call__(self,enum_proc,workers):
+    self.report_score(enum_proc)
 
 
 def enumerate_topologies(leafdist_histograms,leaves_to_assemble,
