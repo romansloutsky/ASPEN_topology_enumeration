@@ -1,5 +1,6 @@
 import sys
 import time
+import time
 import os
 import math
 import itertools
@@ -1535,19 +1536,30 @@ class MainTopologyEnumerationProcess(multiprocessing.Process):
       raise
 
 
+import subprocess
 from sys import float_info,stderr
 
 
 class EnumerationObserver(object):
   ONE_HOUR = 3600
+  SIX_HOURS = 21600
   
   def __init__(self,terminator_file='stop_enumeration',
-               timestamp_frequency=ONE_HOUR):
+               timestamp_frequency=ONE_HOUR,
+               username_for_top=None,report_frequency=SIX_HOURS,
+               report_on_workers=False):
     self.terminator = terminator_file
     self.timestamp_freq = timestamp_frequency
+    self.username = username_for_top
+    self.report_freq = report_frequency
+    self.report_on_workers = report_on_workers
     self.old_min_score = -float_info.max
+    
     self.start_time = time.time()
     self.time_of_last_stamp = self.start_time
+    self.time_of_last_report = self.start_time
+    
+    self.first_call = True
   
   def time_since(self,time_in_past):
     return time.time()-time_in_past
@@ -1577,6 +1589,24 @@ class EnumerationObserver(object):
     print >>stderr,self.timestamp,"Elapsed since start"
     self.time_of_last_stamp = time.time()
 
+  def report_top_output(self,enum_proc,workers=None):
+    self.dict_proc_PID = enum_proc.encountered_assemblies_manager._process.pid
+    self.queue_proc_PID = enum_proc.assembly_queue_manager._process.pid
+    print >>stderr,'='*80
+    subprocess.call('top -n 1 -b | grep PID',shell=True)
+    print >>stderr,'-'*31+'Shared Dict Process'+'-'*30
+    grep_this = '"'+str(self.dict_proc_PID)+' %s"' % self.username
+    subprocess.call('top -n 1 -u %s -b | grep ' % self.username + grep_this,
+                    shell=True)
+    if workers is not None:
+      print >>stderr,'-'*32+'Worker Processes'+'-'*32
+      proc_PIDs = workers.keys() + [self.queue_proc_PID,self.dict_proc_PID]
+      proc_args = ' '.join(['-p'+str(pid) for pid in proc_PIDs])
+      subprocess.call('top -n 1 '+proc_args+' -b | grep %s' % self.username,
+                      shell=True)
+    print >>stderr,'~'*80
+    self.time_of_last_report = time.time()
+  
   def report_score(self,enum_proc):
     if enum_proc.min_score.value > self.old_min_score:
       self.old_min_score = enum_proc.min_score.value
@@ -1593,6 +1623,14 @@ class EnumerationObserver(object):
   def __call__(self,enum_proc,workers):
     if self.time_since(self.time_of_last_stamp) > self.timestamp_freq:
       self.report_timestamp()
+    if self.first_call or\
+                  self.time_since(self.time_of_last_report) > self.report_freq:
+      if self.username is not None:
+        if self.report_on_workers:
+          self.report_top_output(enum_proc,workers)
+        else:
+          self.report_top_output(enum_proc)
+        self.first_call = False
     self.report_score(enum_proc)
 
 
